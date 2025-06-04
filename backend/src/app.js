@@ -4,6 +4,8 @@ import helmet from 'helmet';
 import dotenv from 'dotenv';
 import mongoose from 'mongoose';
 import rateLimit from 'express-rate-limit';
+import { createServer } from 'http';
+import { Server } from 'socket.io';
 
 // Import routes
 import authRoutes from './routes/auth.js';
@@ -13,11 +15,36 @@ import dashboardRoutes from './routes/dashboard.js';
 // Import middleware
 import { errorHandler } from './middleware/errorHandler.js';
 import { logger } from './utils/logger.js';
+import { authenticateSocket } from './middleware/socketAuth.js';
+import { handleEmailSocket } from './sockets/emailSocket.js';
 
 dotenv.config();
 
 const app = express();
+const server = createServer(app);
 const PORT = process.env.PORT || 3000;
+
+// Initialize Socket.IO
+const io = new Server(server, {
+  cors: {
+    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+    credentials: true,
+    methods: ["GET", "POST"]
+  }
+});
+
+// Socket.IO authentication middleware
+io.use(authenticateSocket);
+
+// Socket.IO connection handling
+io.on('connection', (socket) => {
+  logger.info(`New socket connection: ${socket.id} for user: ${socket.userId}`);
+  handleEmailSocket(io, socket);
+});
+
+// Export io instance for use in other modules
+let ioInstance = io;
+export const getIO = () => ioInstance;
 
 // Security middleware
 app.use(helmet());
@@ -50,7 +77,11 @@ app.use('/api/dashboard', dashboardRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'OK', timestamp: new Date().toISOString() });
+  res.status(200).json({ 
+    status: 'OK', 
+    timestamp: new Date().toISOString(),
+    socketConnections: io.engine.clientsCount
+  });
 });
 
 // Error handling middleware
@@ -61,8 +92,10 @@ app.use('*', (req, res) => {
   res.status(404).json({ error: 'Route not found' });
 });
 
-app.listen(PORT, () => {
+// Use server.listen instead of app.listen for Socket.IO
+server.listen(PORT, () => {
   logger.info(`Server running on port ${PORT}`);
+  logger.info(`Socket.IO server initialized`);
 });
 
 export default app;
