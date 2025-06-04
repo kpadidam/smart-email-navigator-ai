@@ -1,6 +1,6 @@
 
 import { Button } from "@/components/ui/button";
-import { Bell, Settings, Mail } from "lucide-react";
+import { Bell, Settings } from "lucide-react";
 
 const Header = () => {
   return (
@@ -8,7 +8,11 @@ const Header = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center">
-            <Mail className="h-8 w-8 text-blue-600 mr-3" />
+            <img 
+              src="https://www.fullthrottle.ai/wp-content/uploads/2023/11/Smart-Mail-Icon-768x768.png" 
+              alt="Smart Mail Logo" 
+              className="h-8 w-8 mr-3"
+            />
             <span className="text-xl font-semibold text-gray-900">EmailTracker AI</span>
           </div>
           
