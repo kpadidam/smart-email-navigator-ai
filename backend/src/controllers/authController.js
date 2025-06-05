@@ -1,8 +1,7 @@
-import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import User from '../models/User.js';
-import { logger } from '../utils/logger.js';
+import { logger, logError, logInfo } from '../utils/logger.js';
 
 // Generate JWT token
 const generateToken = (userId) => {
@@ -36,21 +35,15 @@ export const register = async (req, res) => {
     // Generate token
     const token = generateToken(user._id);
 
-    logger.info(`New user registered: ${email}`);
+    logInfo('New user registered', { email, userId: user._id });
 
     res.status(201).json({
       message: 'User registered successfully',
       token,
-      user: {
-        id: user._id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        isEmailVerified: user.isEmailVerified
-      }
+      user
     });
   } catch (error) {
-    logger.error('Registration error:', error);
+    logError(error, { endpoint: 'register', email: req.body?.email });
     res.status(500).json({ error: 'Registration failed' });
   }
 };
@@ -60,10 +53,15 @@ export const login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Find user
-    const user = await User.findOne({ email });
+    // Find user and include password for comparison
+    const user = await User.findOne({ email }).select('+password');
     if (!user) {
       return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    // Check if user is active
+    if (!user.isActive) {
+      return res.status(401).json({ error: 'Account is deactivated' });
     }
 
     // Check password
@@ -79,21 +77,15 @@ export const login = async (req, res) => {
     // Generate token
     const token = generateToken(user._id);
 
-    logger.info(`User logged in: ${email}`);
+    logInfo('User logged in', { email, userId: user._id });
 
     res.json({
       message: 'Login successful',
       token,
-      user: {
-        id: user._id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        isEmailVerified: user.isEmailVerified
-      }
+      user
     });
   } catch (error) {
-    logger.error('Login error:', error);
+    logError(error, { endpoint: 'login', email: req.body?.email });
     res.status(500).json({ error: 'Login failed' });
   }
 };
@@ -102,17 +94,10 @@ export const login = async (req, res) => {
 export const getMe = async (req, res) => {
   try {
     res.json({
-      user: {
-        id: req.user._id,
-        email: req.user.email,
-        firstName: req.user.firstName,
-        lastName: req.user.lastName,
-        isEmailVerified: req.user.isEmailVerified,
-        lastLogin: req.user.lastLogin
-      }
+      user: req.user
     });
   } catch (error) {
-    logger.error('Get user error:', error);
+    logError(error, { userId: req.user?._id, endpoint: 'getMe' });
     res.status(500).json({ error: 'Failed to get user data' });
   }
 };
@@ -130,16 +115,10 @@ export const updateProfile = async (req, res) => {
 
     res.json({
       message: 'Profile updated successfully',
-      user: {
-        id: user._id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        isEmailVerified: user.isEmailVerified
-      }
+      user
     });
   } catch (error) {
-    logger.error('Update profile error:', error);
+    logError(error, { userId: req.user?._id, endpoint: 'updateProfile' });
     res.status(500).json({ error: 'Failed to update profile' });
   }
 };
@@ -149,7 +128,8 @@ export const changePassword = async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
 
-    const user = await User.findById(req.user._id);
+    // Get user with password field
+    const user = await User.findById(req.user._id).select('+password');
     
     // Verify current password
     const isCurrentPasswordValid = await user.comparePassword(currentPassword);
@@ -161,11 +141,11 @@ export const changePassword = async (req, res) => {
     user.password = newPassword;
     await user.save();
 
-    logger.info(`Password changed for user: ${user.email}`);
+    logInfo('Password changed', { userId: user._id, email: user.email });
 
     res.json({ message: 'Password changed successfully' });
   } catch (error) {
-    logger.error('Change password error:', error);
+    logError(error, { userId: req.user?._id, endpoint: 'changePassword' });
     res.status(500).json({ error: 'Failed to change password' });
   }
 };
@@ -188,11 +168,11 @@ export const requestPasswordReset = async (req, res) => {
     await user.save();
 
     // TODO: Send email with reset link
-    logger.info(`Password reset requested for: ${email}`);
+    logInfo('Password reset requested', { email });
 
     res.json({ message: 'If the email exists, a reset link has been sent' });
   } catch (error) {
-    logger.error('Password reset request error:', error);
+    logError(error, { endpoint: 'requestPasswordReset', email: req.body?.email });
     res.status(500).json({ error: 'Failed to process password reset request' });
   }
 };
@@ -217,11 +197,11 @@ export const resetPassword = async (req, res) => {
     user.passwordResetExpires = undefined;
     await user.save();
 
-    logger.info(`Password reset completed for user: ${user.email}`);
+    logInfo('Password reset completed', { userId: user._id, email: user.email });
 
     res.json({ message: 'Password reset successfully' });
   } catch (error) {
-    logger.error('Password reset error:', error);
+    logError(error, { endpoint: 'resetPassword' });
     res.status(500).json({ error: 'Failed to reset password' });
   }
 };
