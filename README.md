@@ -1,73 +1,150 @@
-# Welcome to your Lovable project
 
-## Project info
+# 📬 Smart Email Navigator AI – FrontEnd
 
-**URL**: https://lovable.dev/projects/8b6f0c64-f054-4cb8-b40e-0ff2fcbf3c11
 
-## How can I edit this code?
 
-There are several ways of editing your application.
 
-**Use Lovable**
+# 📬 Smart Email Navigator AI – Backend
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/8b6f0c64-f054-4cb8-b40e-0ff2fcbf3c11) and start prompting.
+This is the backend server for the Smart Email Navigator AI system — a productivity dashboard that fetches, categorizes, and summarizes emails using AI, and emits real-time updates to the frontend via WebSockets.
 
-Changes made via Lovable will be committed automatically to this repo.
+---
 
-**Use your preferred IDE**
+## 🚀 Features
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+- ✅ Gmail OAuth2 integration (secure Gmail fetch)
+- ✅ OpenAI-powered email classification & summarization
+- ✅ JWT-based user authentication
+- ✅ MongoDB-based persistence
+- ✅ Real-time updates via Socket.IO
+- ✅ Shared inboxes / team collaboration
+- ✅ RESTful API for emails, users, dashboard
+- ✅ Email sync via cron jobs
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+---
 
-Follow these steps:
+## 🧱 Tech Stack
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+| Layer         | Tech                     |
+|---------------|--------------------------|
+| API Framework | Express.js               |
+| Database      | MongoDB + Mongoose       |
+| Auth          | JWT + bcrypt             |
+| Gmail Access  | Gmail API (OAuth2)       |
+| AI/ML         | OpenAI GPT-4             |
+| Real-time     | Socket.IO (WebSockets)   |
+| Logging       | Winston                  |
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+---
 
-# Step 3: Install the necessary dependencies.
-npm i
+## 📁 Project Structure
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+backend/
+├── config/             # Gmail & DB config
+├── controllers/        # REST logic (auth, emails, dashboard)
+├── middleware/         # Auth, rate limit, error handling
+├── models/             # Mongoose schemas
+├── routes/             # Express routes
+├── services/           # GmailService, AIService, EmailProcessor
+├── sockets/            # Socket.IO handlers
+├── utils/              # Logging, parsing, prompts
+├── app.js              # Main Express + Socket.IO app
+└── package.json
+
+---
+
+## 🧠 Architecture Overview
+
+```text
+User ───> [ REST API ]
+     │           │
+     │           └──> MongoDB (User, Emails)
+     │
+     └── Socket.IO <── Email Processor <── Gmail API + OpenAI
+
+	•	Gmail OAuth2 fetches unread emails
+	•	OpenAI classifies and summarizes each message
+	•	Emails and metadata stored in MongoDB
+	•	Socket.IO emits real-time events to frontend
+
+⸻
+
+🔧 Setup Instructions
+
+1. Clone the Repo
+
+git clone https://github.com/your-org/smart-email-navigator-ai.git
+cd smart-email-navigator-ai/backend
+
+2. Install Dependencies
+
+npm install
+
+3. Create .env File
+
+PORT=3000
+MONGODB_URI=mongodb://localhost:27017/email-navigator
+JWT_SECRET=your_jwt_secret
+OPENAI_API_KEY=your_openai_key
+
+GMAIL_CLIENT_ID=your_google_client_id
+GMAIL_CLIENT_SECRET=your_google_secret
+GMAIL_REDIRECT_URI=http://localhost:3000/api/auth/google/callback
+
+FRONTEND_URL=http://localhost:5173
+
+4. Run the Server
+
 npm run dev
-```
 
-**Edit a file directly in GitHub**
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+⸻
 
-**Use GitHub Codespaces**
+📡 API Reference
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+Auth Endpoints
+	•	POST /api/auth/register
+	•	POST /api/auth/login
+	•	GET /api/auth/me
+	•	PUT /api/auth/change-password
 
-## What technologies are used for this project?
+Email Endpoints
+	•	GET /api/emails?category=meetings
+	•	POST /api/emails/sync
+	•	PUT /api/emails/:id/archive
+	•	PUT /api/emails/:id/mark-done
 
-This project is built with:
+Dashboard
+	•	GET /api/dashboard/stats
+	•	GET /api/dashboard/recent
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+Shared Inbox
+	•	POST /api/email-accounts/:id/share
+	•	GET /api/shared-inboxes
 
-## How can I deploy this project?
+⸻
 
-Simply open [Lovable](https://lovable.dev/projects/8b6f0c64-f054-4cb8-b40e-0ff2fcbf3c11) and click on Share -> Publish.
+🔄 Real-time WebSocket Events
+	•	connected – socket connection successful
+	•	email:new – new Gmail message fetched
+	•	email:processed – AI summary ready
+	•	dashboard:stats_updated – live update of stats
+	•	email:status_changed – read/unread/starred updates
 
-## Can I connect a custom domain to my Lovable project?
+Connect from frontend:
 
-Yes, you can!
+import io from 'socket.io-client';
+const socket = io('http://localhost:3000', {
+  auth: { token: yourJWT }
+});
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+⸻
+
+⏱️ Cron-based Sync
+	•	Runs every 5 minutes by default
+	•	Fetches unread Gmail messa
+	•	Processes and emits live updates
+
+⸻
+

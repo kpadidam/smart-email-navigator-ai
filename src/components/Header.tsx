@@ -13,7 +13,7 @@ const Header = () => {
               alt="Smart Mail Logo" 
               className="h-8 w-8 mr-3"
             />
-            <span className="text-xl font-semibold text-gray-900">EmailTracker AI</span>
+            <span className="text-xl font-semibold text-gray-900">Eagle AI</span>
           </div>
           
           <div className="flex items-center space-x-4">
