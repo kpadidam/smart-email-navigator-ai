@@ -6,9 +6,10 @@ import { Button } from "@/components/ui/button";
 interface SearchBarProps {
   searchTerm: string;
   onSearchChange: (term: string) => void;
+  onFilterClick?: () => void; // Added an optional onFilterClick prop
 }
 
-const SearchBar = ({ searchTerm, onSearchChange }: SearchBarProps) => {
+const SearchBar = ({ searchTerm, onSearchChange, onFilterClick }: SearchBarProps) => {
   return (
     <div className="flex space-x-4">
       <div className="flex-1">
@@ -20,7 +21,7 @@ const SearchBar = ({ searchTerm, onSearchChange }: SearchBarProps) => {
           className="w-full"
         />
       </div>
-      <Button variant="outline" size="icon">
+      <Button variant="outline" size="icon" onClick={onFilterClick}>
         <Filter className="h-4 w-4" />
       </Button>
     </div>
