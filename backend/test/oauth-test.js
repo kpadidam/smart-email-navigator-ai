@@ -113,6 +113,15 @@ const testEnvironmentVariables = () => {
     }
   });
   
+  if (!allPresent) {
+    console.log('\n💡 Create a .env file in the backend directory with:');
+    console.log('GOOGLE_CLIENT_ID=your_google_client_id');
+    console.log('GOOGLE_CLIENT_SECRET=your_google_client_secret');
+    console.log('GOOGLE_REDIRECT_URI=http://localhost:5000/api/auth/google/callback');
+    console.log('JWT_SECRET=your_jwt_secret');
+    console.log('MONGODB_URI=mongodb://localhost:27017/email-manager');
+  }
+  
   return allPresent;
 };
 
@@ -133,7 +142,12 @@ const runTests = async () => {
     console.log('\n✅ Server is running');
   } catch (error) {
     console.log('\n❌ Server is not running. Please start your backend server first.');
-    console.log('Run: npm start or node src/app.js');
+    console.log('💡 To start the backend server:');
+    console.log('   cd backend');
+    console.log('   npm start');
+    console.log('\n💡 Then run this test from the backend directory:');
+    console.log('   cd backend');
+    console.log('   node test/oauth-test.js');
     return;
   }
   
