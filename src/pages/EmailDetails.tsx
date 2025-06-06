@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Label } from "@/components/ui/label";
 import { Calendar, Package, Briefcase, Mail, ArrowLeft, Archive, Trash2, Clock } from "lucide-react";
 
 const EmailDetails = () => {
