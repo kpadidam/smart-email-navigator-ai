@@ -2,11 +2,17 @@ import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
 
 const userSchema = new mongoose.Schema({
-  name: {
+  firstName: {
     type: String,
-    required: [true, 'Name is required'],
+    required: [true, 'First name is required'],
     trim: true,
-    maxlength: [50, 'Name cannot be more than 50 characters']
+    maxlength: [50, 'First name cannot be more than 50 characters']
+  },
+  lastName: {
+    type: String,
+    required: [true, 'Last name is required'],
+    trim: true,
+    maxlength: [50, 'Last name cannot be more than 50 characters']
   },
   email: {
     type: String,
@@ -47,18 +53,25 @@ const userSchema = new mongoose.Schema({
     select: false
   },
   gmailTokens: {
-    accessToken: {
+    access_token: {
       type: String,
       select: false
     },
-    refreshToken: {
+    refresh_token: {
       type: String,
       select: false
     },
-    expiryDate: {
+    expiry_date: {
       type: Date,
       select: false
     }
+  },
+  gmailConnected: {
+    type: Boolean,
+    default: false
+  },
+  gmailConnectedAt: {
+    type: Date
   },
   lastLogin: {
     type: Date
