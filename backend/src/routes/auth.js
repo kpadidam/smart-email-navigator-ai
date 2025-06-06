@@ -6,7 +6,12 @@ import {
   updateProfile,
   changePassword,
   requestPasswordReset,
-  resetPassword
+  resetPassword,
+  initiateGoogleAuth,
+  handleGoogleCallback,
+  disconnectGmail,
+  getGmailStatus,
+  refreshGmailTokens
 } from '../controllers/authController.js';
 import { authenticate } from '../middleware/auth.js';
 import { authLimiter } from '../middleware/rateLimiter.js';
@@ -23,5 +28,12 @@ router.post('/reset-password', authLimiter, resetPassword);
 router.get('/me', authenticate, getMe);
 router.put('/profile', authenticate, updateProfile);
 router.put('/change-password', authenticate, changePassword);
+
+// Google OAuth routes
+router.get('/google/login', authenticate, initiateGoogleAuth);
+router.post('/google/callback', authenticate, handleGoogleCallback);
+router.post('/google/disconnect', authenticate, disconnectGmail);
+router.get('/google/status', authenticate, getGmailStatus);
+router.post('/google/refresh', authenticate, refreshGmailTokens);
 
 export default router;
