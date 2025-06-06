@@ -1,8 +1,8 @@
-
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Calendar, Package, Briefcase, Mail } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { useNavigate } from "react-router-dom";
 
 interface EmailListProps {
   selectedCategory: string;
@@ -10,6 +10,8 @@ interface EmailListProps {
 }
 
 const EmailList = ({ selectedCategory, searchTerm }: EmailListProps) => {
+  const navigate = useNavigate();
+
   // Mock email data with AI classifications
   const emails = [
     {
@@ -114,7 +116,11 @@ const EmailList = ({ selectedCategory, searchTerm }: EmailListProps) => {
         const iconColor = getCategoryColor(email.category);
         
         return (
-          <Card key={email.id} className="hover:shadow-md transition-shadow">
+          <Card 
+            key={email.id} 
+            className="hover:shadow-md transition-shadow cursor-pointer"
+            onClick={() => navigate(`/email/${email.id}`)}
+          >
             <CardContent className="p-6">
               <div className="flex items-start justify-between">
                 <div className="flex items-start space-x-4 flex-1">
@@ -158,7 +164,7 @@ const EmailList = ({ selectedCategory, searchTerm }: EmailListProps) => {
                       </div>
                     )}
                     
-                    <div className="flex space-x-2">
+                    <div className="flex space-x-2" onClick={(e) => e.stopPropagation()}>
                       <Button size="sm" variant="outline">
                         Archive
                       </Button>
