@@ -1,19 +1,31 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
-import { User, Bell, Mail, Shield, Download } from "lucide-react";
+import { User, Bell, Mail, Shield, Download, ArrowLeft } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import Header from "../components/Header";
 
 const Settings = () => {
+  const navigate = useNavigate();
+
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
+          <div className="flex items-center space-x-4 mb-4">
+            <Button 
+              variant="outline" 
+              onClick={() => navigate("/")}
+              className="flex items-center space-x-2"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              <span>Back to Inbox</span>
+            </Button>
+          </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Settings</h1>
           <p className="text-gray-600">Manage your account preferences and email settings</p>
         </div>
