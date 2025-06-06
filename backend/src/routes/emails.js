@@ -19,15 +19,15 @@ router.get('/', async (req, res) => {
     const query = { userId };
     
     if (category && category !== 'all') {
-      query.category = category;
+      query['aiAnalysis.category'] = category;
     }
     
     if (search) {
       query.$or = [
         { subject: { $regex: search, $options: 'i' } },
-        { 'sender.name': { $regex: search, $options: 'i' } },
-        { 'sender.email': { $regex: search, $options: 'i' } },
-        { body: { $regex: search, $options: 'i' } }
+        { 'from.name': { $regex: search, $options: 'i' } },
+        { 'from.email': { $regex: search, $options: 'i' } },
+        { 'body.text': { $regex: search, $options: 'i' } }
       ];
     }
 
@@ -101,8 +101,8 @@ router.get('/stats', async (req, res) => {
     const [totalEmails, unreadEmails, categorizedEmails, pendingActions] = await Promise.all([
       Email.countDocuments({ userId }),
       Email.countDocuments({ userId, isRead: false }),
-      Email.countDocuments({ userId, category: { $exists: true, $ne: null } }),
-      Email.countDocuments({ userId, isDone: false, isArchived: false })
+      Email.countDocuments({ userId, 'aiAnalysis.category': { $exists: true, $ne: null } }),
+      Email.countDocuments({ userId, isRead: false, isStarred: false })
     ]);
 
     const stats = {
@@ -126,7 +126,7 @@ router.get('/categories', async (req, res) => {
 
     const categoryCounts = await Email.aggregate([
       { $match: { userId } },
-      { $group: { _id: '$category', count: { $sum: 1 } } },
+      { $group: { _id: '$aiAnalysis.category', count: { $sum: 1 } } },
       { $project: { category: '$_id', count: 1, _id: 0 } },
       { $sort: { count: -1 } }
     ]);
