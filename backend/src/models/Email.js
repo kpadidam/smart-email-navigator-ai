@@ -95,7 +95,6 @@ const emailSchema = new mongoose.Schema({
 // Indexes for efficient queries
 emailSchema.index({ userId: 1, receivedAt: -1 });
 emailSchema.index({ emailAccountId: 1, receivedAt: -1 });
-emailSchema.index({ messageId: 1 }, { unique: true });
 emailSchema.index({ 'from.email': 1 });
 emailSchema.index({ 'aiAnalysis.category': 1 });
 emailSchema.index({ 'aiAnalysis.priority': 1 });
