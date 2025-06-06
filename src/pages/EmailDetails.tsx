@@ -3,8 +3,10 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Calendar, Package, Briefcase, Mail, ArrowLeft, Archive, Trash2, Clock } from "lucide-react";
+import Header from "../components/Header";
 
 const EmailDetails = () => {
   const { id } = useParams();
@@ -82,6 +84,7 @@ sarah@techcorp.com
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <Header />
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-6">
