@@ -2,6 +2,7 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import User from '../models/User.js';
 import { logger, logError, logInfo } from '../utils/logger.js';
+import { getAuthUrl, getTokens, oauth2Client } from '../../config/gmail.js';
 
 // Generate JWT token
 const generateToken = (userId) => {
@@ -203,5 +204,140 @@ export const resetPassword = async (req, res) => {
   } catch (error) {
     logError(error, { endpoint: 'resetPassword' });
     res.status(500).json({ error: 'Failed to reset password' });
+  }
+};
+
+// Initiate Google OAuth
+export const initiateGoogleAuth = async (req, res) => {
+  try {
+    const authUrl = getAuthUrl();
+    
+    logInfo('Google OAuth initiated', { userId: req.user._id });
+    
+    res.json({
+      authUrl,
+      message: 'Redirect user to this URL for Google authentication'
+    });
+  } catch (error) {
+    logError(error, { userId: req.user?._id, endpoint: 'initiateGoogleAuth' });
+    res.status(500).json({ error: 'Failed to initiate Google authentication' });
+  }
+};
+
+// Handle Google OAuth callback
+export const handleGoogleCallback = async (req, res) => {
+  try {
+    const { code } = req.body;
+    
+    if (!code) {
+      return res.status(400).json({ error: 'Authorization code is required' });
+    }
+
+    // Exchange code for tokens
+    const tokens = await getTokens(code);
+    
+    // Store tokens in user record
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      { 
+        gmailTokens: tokens,
+        gmailConnected: true,
+        gmailConnectedAt: new Date()
+      },
+      { new: true }
+    );
+
+    logInfo('Google OAuth completed', { 
+      userId: user._id, 
+      email: user.email,
+      hasRefreshToken: !!tokens.refresh_token 
+    });
+
+    res.json({
+      message: 'Gmail account connected successfully',
+      user
+    });
+  } catch (error) {
+    logError(error, { userId: req.user?._id, endpoint: 'handleGoogleCallback' });
+    res.status(500).json({ error: 'Failed to complete Google authentication' });
+  }
+};
+
+// Disconnect Gmail account
+export const disconnectGmail = async (req, res) => {
+  try {
+    const user = await User.findByIdAndUpdate(
+      req.user._id,
+      { 
+        gmailTokens: undefined,
+        gmailConnected: false,
+        gmailConnectedAt: undefined
+      },
+      { new: true }
+    );
+
+    logInfo('Gmail account disconnected', { userId: user._id, email: user.email });
+
+    res.json({
+      message: 'Gmail account disconnected successfully',
+      user
+    });
+  } catch (error) {
+    logError(error, { userId: req.user?._id, endpoint: 'disconnectGmail' });
+    res.status(500).json({ error: 'Failed to disconnect Gmail account' });
+  }
+};
+
+// Check Gmail connection status
+export const getGmailStatus = async (req, res) => {
+  try {
+    const user = req.user;
+    
+    res.json({
+      connected: user.gmailConnected || false,
+      connectedAt: user.gmailConnectedAt,
+      hasTokens: !!user.gmailTokens
+    });
+  } catch (error) {
+    logError(error, { userId: req.user?._id, endpoint: 'getGmailStatus' });
+    res.status(500).json({ error: 'Failed to get Gmail status' });
+  }
+};
+
+// Refresh Gmail tokens
+export const refreshGmailTokens = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    
+    if (!user.gmailTokens || !user.gmailTokens.refresh_token) {
+      return res.status(400).json({ error: 'No refresh token available. Please reconnect your Gmail account.' });
+    }
+
+    // Set the refresh token
+    oauth2Client.setCredentials({
+      refresh_token: user.gmailTokens.refresh_token
+    });
+
+    // Refresh the access token
+    const { credentials } = await oauth2Client.refreshAccessToken();
+    
+    // Update user with new tokens
+    const updatedTokens = {
+      ...user.gmailTokens,
+      access_token: credentials.access_token,
+      expiry_date: credentials.expiry_date
+    };
+
+    await User.findByIdAndUpdate(user._id, { gmailTokens: updatedTokens });
+
+    logInfo('Gmail tokens refreshed', { userId: user._id });
+
+    res.json({
+      message: 'Gmail tokens refreshed successfully',
+      expiryDate: credentials.expiry_date
+    });
+  } catch (error) {
+    logError(error, { userId: req.user?._id, endpoint: 'refreshGmailTokens' });
+    res.status(500).json({ error: 'Failed to refresh Gmail tokens' });
   }
 };
