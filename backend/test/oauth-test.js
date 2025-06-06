@@ -129,6 +129,16 @@ const runTests = async () => {
   console.log('🚀 Starting Google OAuth Implementation Tests\n');
   console.log('=' .repeat(50));
   
+  // Check if we're in the right directory
+  const currentDir = process.cwd();
+  if (!currentDir.endsWith('backend')) {
+    console.log('❌ Wrong directory! You must run this test from the backend directory.');
+    console.log('💡 Run these commands:');
+    console.log('   cd backend');
+    console.log('   node test/oauth-test.js');
+    return;
+  }
+  
   // Test environment variables
   const envOk = testEnvironmentVariables();
   if (!envOk) {
@@ -142,11 +152,11 @@ const runTests = async () => {
     console.log('\n✅ Server is running');
   } catch (error) {
     console.log('\n❌ Server is not running. Please start your backend server first.');
-    console.log('💡 To start the backend server:');
+    console.log('💡 To start the backend server (in another terminal):');
     console.log('   cd backend');
     console.log('   npm start');
-    console.log('\n💡 Then run this test from the backend directory:');
-    console.log('   cd backend');
+    console.log('\n💡 Make sure you see "Server running on port 5000" message');
+    console.log('💡 Then run this test again:');
     console.log('   node test/oauth-test.js');
     return;
   }
