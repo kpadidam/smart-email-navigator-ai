@@ -1,39 +1,105 @@
 import express from 'express';
-import {
-  register,
-  login,
-  getMe,
-  updateProfile,
-  changePassword,
-  requestPasswordReset,
-  resetPassword,
-  initiateGoogleAuth,
-  handleGoogleCallback,
-  disconnectGmail,
-  getGmailStatus,
-  refreshGmailTokens
-} from '../controllers/authController.js';
-import { authenticate } from '../middleware/auth.js';
-import { authLimiter } from '../middleware/rateLimiter.js';
+import { google } from 'googleapis';
+import jwt from 'jsonwebtoken';
+import User from '../models/User.js';
+import { logger } from '../utils/logger.js';
 
 const router = express.Router();
 
-// Public routes
-router.post('/register', authLimiter, register);
-router.post('/login', authLimiter, login);
-router.post('/forgot-password', authLimiter, requestPasswordReset);
-router.post('/reset-password', authLimiter, resetPassword);
+// Google OAuth configuration
+const oauth2Client = new google.auth.OAuth2(
+  process.env.GOOGLE_CLIENT_ID,
+  process.env.GOOGLE_CLIENT_SECRET,
+  process.env.GOOGLE_REDIRECT_URI
+);
 
-// Protected routes
-router.get('/me', authenticate, getMe);
-router.put('/profile', authenticate, updateProfile);
-router.put('/change-password', authenticate, changePassword);
+// Generate Google OAuth URL
+router.get('/google', (req, res) => {
+  try {
+    const scopes = [
+      'https://www.googleapis.com/auth/userinfo.email',
+      'https://www.googleapis.com/auth/userinfo.profile',
+      'https://www.googleapis.com/auth/gmail.readonly'
+    ];
 
-// Google OAuth routes
-router.get('/google/login', authenticate, initiateGoogleAuth);
-router.post('/google/callback', authenticate, handleGoogleCallback);
-router.post('/google/disconnect', authenticate, disconnectGmail);
-router.get('/google/status', authenticate, getGmailStatus);
-router.post('/google/refresh', authenticate, refreshGmailTokens);
+    const authUrl = oauth2Client.generateAuthUrl({
+      access_type: 'offline',
+      scope: scopes,
+      prompt: 'consent'
+    });
+
+    res.json({ authUrl });
+  } catch (error) {
+    logger.error('Error generating OAuth URL:', error);
+    res.status(500).json({ error: 'Failed to generate OAuth URL' });
+  }
+});
+
+// Handle Google OAuth callback
+router.post('/google/callback', async (req, res) => {
+  try {
+    const { code } = req.body;
+
+    if (!code) {
+      return res.status(400).json({ error: 'Authorization code is required' });
+    }
+
+    // Exchange code for tokens
+    const { tokens } = await oauth2Client.getToken(code);
+    oauth2Client.setCredentials(tokens);
+
+    // Get user info from Google
+    const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client });
+    const { data: userInfo } = await oauth2.userinfo.get();
+
+    // Find or create user
+    let user = await User.findOne({ email: userInfo.email });
+    
+    if (!user) {
+      user = new User({
+        email: userInfo.email,
+        name: userInfo.name,
+        picture: userInfo.picture,
+        googleId: userInfo.id,
+        gmailTokens: tokens,
+        isEmailVerified: true
+      });
+      await user.save();
+      logger.info(`New user created: ${user.email}`);
+    } else {
+      // Update existing user's tokens
+      user.gmailTokens = tokens;
+      user.picture = userInfo.picture;
+      await user.save();
+      logger.info(`User tokens updated: ${user.email}`);
+    }
+
+    // Generate JWT token
+    const jwtToken = jwt.sign(
+      { userId: user._id, email: user.email },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    res.json({
+      user: {
+        id: user._id,
+        email: user.email,
+        name: user.name,
+        picture: user.picture
+      },
+      token: jwtToken
+    });
+
+  } catch (error) {
+    logger.error('OAuth callback error:', error);
+    res.status(500).json({ error: 'Authentication failed' });
+  }
+});
+
+// Logout
+router.post('/logout', (req, res) => {
+  res.json({ message: 'Logged out successfully' });
+});
 
 export default router;
