@@ -138,7 +138,7 @@ const runTests = async () => {
   
   // Test server connection
   try {
-    await axios.get(`${BASE_URL}/health`);
+    await axios.get('http://localhost:5000/health');
     console.log('\n✅ Server is running');
   } catch (error) {
     console.log('\n❌ Server is not running. Please start your backend server first.');
