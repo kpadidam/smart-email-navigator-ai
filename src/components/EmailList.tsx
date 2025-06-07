@@ -1,8 +1,10 @@
+import { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Calendar, Package, Briefcase, Mail } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
+import { emailService, Email } from "@/services/emailService";
 
 interface EmailListProps {
   selectedCategory: string;
@@ -11,65 +13,24 @@ interface EmailListProps {
 
 const EmailList = ({ selectedCategory, searchTerm }: EmailListProps) => {
   const navigate = useNavigate();
+  const [emails, setEmails] = useState<Email[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Mock email data with AI classifications
-  const emails = [
-    {
-      id: 1,
-      sender: "Sarah Johnson",
-      senderEmail: "sarah@techcorp.com",
-      subject: "Weekly Team Meeting - Tomorrow 2PM",
-      summary: "Team meeting scheduled for tomorrow at 2PM in Conference Room B to discuss project milestones.",
-      category: "meetings",
-      datetime: "2025-06-06T14:00:00",
-      timestamp: "2 hours ago",
-      priority: "high"
-    },
-    {
-      id: 2,
-      sender: "Amazon",
-      senderEmail: "shipping@amazon.com",
-      subject: "Your package will arrive tomorrow",
-      summary: "Package #123456789 containing laptop accessories will be delivered tomorrow between 9AM-5PM.",
-      category: "delivery",
-      datetime: "2025-06-06T12:00:00",
-      timestamp: "4 hours ago",
-      priority: "medium"
-    },
-    {
-      id: 3,
-      sender: "Google HR",
-      senderEmail: "recruiting@google.com",
-      subject: "Final Interview Scheduled - Software Engineer Position",
-      summary: "Final round interview scheduled for Friday at 10:30AM via Google Meet for Software Engineer role.",
-      category: "interviews",
-      datetime: "2025-06-08T10:30:00",
-      timestamp: "1 day ago",
-      priority: "high"
-    },
-    {
-      id: 4,
-      sender: "Mike Chen",
-      senderEmail: "mike@startup.io",
-      subject: "Project Update and Next Steps",
-      summary: "Project update on the mobile app development and discussion of next sprint planning.",
-      category: "other",
-      datetime: null,
-      timestamp: "3 hours ago",
-      priority: "low"
-    },
-    {
-      id: 5,
-      sender: "LinkedIn",
-      senderEmail: "invitations@linkedin.com",
-      subject: "Coffee Chat Tomorrow - Product Manager Role",
-      summary: "Informal coffee chat scheduled tomorrow at 11AM at Starbucks downtown to discuss PM opportunities.",
-      category: "meetings",
-      datetime: "2025-06-06T11:00:00",
-      timestamp: "5 hours ago",
-      priority: "medium"
-    }
-  ];
+  useEffect(() => {
+    const loadEmails = async () => {
+      try {
+        const data = await emailService.fetchEmails();
+        setEmails(data);
+      } catch (err) {
+        setError('Failed to load emails');
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadEmails();
+  }, []);
 
   const getCategoryIcon = (category: string) => {
     switch (category) {
@@ -108,6 +69,14 @@ const EmailList = ({ selectedCategory, searchTerm }: EmailListProps) => {
     
     return matchesCategory && matchesSearch;
   });
+
+  if (loading) {
+    return <div>Loading emails...</div>;
+  }
+
+  if (error) {
+    return <div>Error: {error}</div>;
+  }
 
   return (
     <div className="space-y-4">

@@ -23,14 +23,14 @@ const Header = () => {
       email: "john.doe@example.com",
       name: "John Doe",
       isDefault: true,
-      avatar: "/placeholder.svg"
+      avatar: "https://www.svgrepo.com/show/82727/profiles-avatar.svg"
     },
     {
       id: 2,
       email: "work@company.com",
       name: "Work Account",
       isDefault: false,
-      avatar: "/placeholder.svg"
+      avatar: "https://www.svgrepo.com/show/72894/man-avatar-with-bald-head-sunglasses-and-mustache.svg"
     }
   ];
 
@@ -44,16 +44,24 @@ const Header = () => {
             className="flex items-center space-x-3 cursor-pointer"
             onClick={() => navigate("/")}
           >
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+            <div className="w-8 h-8  rounded-lg flex items-center justify-center">
               <img 
-                src="/placeholder.svg" 
+                       src="https://www.fullthrottle.ai/wp-content/uploads/2023/11/Smart-Mail-Icon-768x768.png" 
                 alt="Logo" 
                 className="w-6 h-6 text-white"
               />
             </div>
-            <h1 className="text-xl font-semibold text-gray-900">Smart Email Tracker</h1>
+            <h1 className="text-xl font-semibold text-gray-900">Eagle AI</h1>
           </div>
-          
+{/* 
+            <img 
+              src="https://www.fullthrottle.ai/wp-content/uploads/2023/11/Smart-Mail-Icon-768x768.png" 
+              alt="Smart Mail Logo" 
+              className="h-8 w-8 mr-3"
+            />
+            <span className="text-xl font-semibold text-gray-900">Eagle AI</span>
+          </div>
+           */}
           <div className="flex items-center space-x-4">
             <Button variant="ghost" size="sm">
               <Bell className="h-4 w-4" />

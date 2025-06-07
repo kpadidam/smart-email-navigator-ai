@@ -1,4 +1,4 @@
-
+import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,50 +7,30 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Calendar, Package, Briefcase, Mail, ArrowLeft, Archive, Trash2, Clock } from "lucide-react";
 import Header from "../components/Header";
+import { emailService, Email } from "@/services/emailService";
 
 const EmailDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [email, setEmail] = useState<Email | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Mock email data - in real app, this would be fetched based on the ID
-  const email = {
-    id: 1,
-    sender: "Sarah Johnson",
-    senderEmail: "sarah@techcorp.com",
-    subject: "Weekly Team Meeting - Tomorrow 2PM",
-    summary: "Team meeting scheduled for tomorrow at 2PM in Conference Room B to discuss project milestones.",
-    fullContent: `Hi Team,
-
-I hope this email finds you well. I wanted to schedule our weekly team meeting for tomorrow (Wednesday) at 2:00 PM in Conference Room B.
-
-Agenda items:
-• Review of last week's deliverables
-• Q3 project milestone discussion
-• Budget allocation for upcoming sprint
-• Client feedback review
-• Planning for next week's objectives
-
-Please come prepared with your individual progress reports and any blockers you're currently facing. If you have any additional items you'd like to discuss, please let me know by end of day today.
-
-Looking forward to seeing everyone there!
-
-Best regards,
-Sarah Johnson
-Project Manager
-TechCorp Solutions
-sarah@techcorp.com
-(555) 123-4567`,
-    category: "meetings",
-    datetime: "2025-06-06T14:00:00",
-    timestamp: "2 hours ago",
-    priority: "high",
-    attachments: [
-      { name: "meeting-agenda.pdf", size: "245 KB" },
-      { name: "project-timeline.xlsx", size: "87 KB" }
-    ],
-    tags: ["meeting", "urgent", "team", "q3"],
-    status: "unread"
-  };
+  useEffect(() => {
+    const loadEmail = async () => {
+      if (!id) return;
+      try {
+        const data = await emailService.fetchEmailById(Number(id));
+        setEmail(data);
+      } catch (err) {
+        setError('Failed to load email details');
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadEmail();
+  }, [id]);
 
   const getCategoryIcon = (category: string) => {
     switch (category) {
@@ -78,6 +58,14 @@ sarah@techcorp.com
       default: return "bg-gray-100 text-gray-800";
     }
   };
+
+  if (loading) {
+    return <div>Loading email details...</div>;
+  }
+
+  if (error || !email) {
+    return <div>Error: {error || 'Email not found'}</div>;
+  }
 
   const Icon = getCategoryIcon(email.category);
   const categoryColorClass = getCategoryColor(email.category);
@@ -131,8 +119,8 @@ sarah@techcorp.com
                     <p className="text-sm text-gray-500">{email.senderEmail}</p>
                   </div>
                   <div className="text-right text-sm text-gray-500">
-                    <p>{new Date(email.datetime).toLocaleDateString()}</p>
-                    <p>{new Date(email.datetime).toLocaleTimeString([], { 
+                    <p>{new Date(email.datetime || '').toLocaleDateString()}</p>
+                    <p>{new Date(email.datetime || '').toLocaleTimeString([], { 
                       hour: '2-digit', 
                       minute: '2-digit' 
                     })}</p>
@@ -198,25 +186,19 @@ sarah@techcorp.com
             {/* Quick Actions */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Quick Actions</CardTitle>
+                <CardTitle>Quick Actions</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
-                {email.category === "meetings" && (
-                  <Button className="w-full">
+              <CardContent>
+                <div className="space-y-2">
+                  <Button variant="outline" className="w-full justify-start">
                     <Calendar className="h-4 w-4 mr-2" />
                     Add to Calendar
                   </Button>
-                )}
-                <Button variant="outline" className="w-full">
-                  <Clock className="h-4 w-4 mr-2" />
-                  Snooze
-                </Button>
-                <Button variant="outline" className="w-full">
-                  Create Task
-                </Button>
-                <Button variant="outline" className="w-full">
-                  Set Reminder
-                </Button>
+                  <Button variant="outline" className="w-full justify-start">
+                    <Clock className="h-4 w-4 mr-2" />
+                    Set Reminder
+                  </Button>
+                </div>
               </CardContent>
             </Card>
 
