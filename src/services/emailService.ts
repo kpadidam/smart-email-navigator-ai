@@ -19,6 +19,13 @@ export interface Email {
   status?: string;
 }
 
+export interface EmailStats {
+  totalEmails: number;
+  unreadEmails: number;
+  categorizedEmails: number;
+  pendingActions: number;
+}
+
 export const emailService = {
   async fetchEmails(): Promise<Email[]> {
     const response = await fetch(`${API_URL}/api/emails`, {
@@ -36,6 +43,16 @@ export const emailService = {
     });
     if (!response.ok) {
       throw new Error('Failed to fetch email details');
+    }
+    return response.json();
+  },
+
+  async fetchEmailStats(): Promise<EmailStats> {
+    const response = await fetch(`${API_URL}/api/emails/stats`, {
+      headers: authService.getAuthHeaders(),
+    });
+    if (!response.ok) {
+      throw new Error('Failed to fetch email statistics');
     }
     return response.json();
   }
