@@ -1,3 +1,4 @@
+
 import express from 'express';
 import { google } from 'googleapis';
 import jwt from 'jsonwebtoken';
@@ -13,7 +14,7 @@ const oauth2Client = new google.auth.OAuth2(
   process.env.GOOGLE_REDIRECT_URI
 );
 
-// Generate Google OAuth URL
+// Generate Google OAuth URL - this matches frontend expectation /api/auth/google
 router.get('/google', (req, res) => {
   try {
     const scopes = [
@@ -28,6 +29,7 @@ router.get('/google', (req, res) => {
       prompt: 'consent'
     });
 
+    logger.info('Generated OAuth URL for client');
     res.json({ authUrl });
   } catch (error) {
     logger.error('Error generating OAuth URL:', error);
@@ -35,7 +37,7 @@ router.get('/google', (req, res) => {
   }
 });
 
-// Handle Google OAuth callback
+// Handle Google OAuth callback - this matches frontend expectation /api/auth/google/callback
 router.post('/google/callback', async (req, res) => {
   try {
     const { code } = req.body;
@@ -44,6 +46,8 @@ router.post('/google/callback', async (req, res) => {
       return res.status(400).json({ error: 'Authorization code is required' });
     }
 
+    logger.info('Processing OAuth callback with code');
+
     // Exchange code for tokens
     const { tokens } = await oauth2Client.getToken(code);
     oauth2Client.setCredentials(tokens);
@@ -51,6 +55,8 @@ router.post('/google/callback', async (req, res) => {
     // Get user info from Google
     const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client });
     const { data: userInfo } = await oauth2.userinfo.get();
+
+    logger.info('Retrieved user info from Google:', { email: userInfo.email });
 
     // Find or create user
     let user = await User.findOne({ email: userInfo.email });
@@ -80,6 +86,8 @@ router.post('/google/callback', async (req, res) => {
       process.env.JWT_SECRET,
       { expiresIn: '7d' }
     );
+
+    logger.info('Authentication successful, sending response');
 
     res.json({
       user: {
