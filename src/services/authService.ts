@@ -1,4 +1,4 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
 export interface User {
   id: string;
@@ -32,6 +32,8 @@ class AuthService {
 
   async initiateGoogleOAuth(): Promise<void> {
     try {
+      console.log('Attempting to connect to:', `${API_URL}/api/auth/google`);
+      
       // Get the OAuth URL from the backend
       const response = await fetch(`${API_URL}/api/auth/google`, {
         method: 'GET',
@@ -41,7 +43,9 @@ class AuthService {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to get OAuth URL');
+        const errorText = await response.text();
+        console.error('OAuth URL request failed:', response.status, errorText);
+        throw new Error(`Failed to get OAuth URL: ${response.status} ${errorText}`);
       }
 
       const data = await response.json();
@@ -50,6 +54,9 @@ class AuthService {
       window.location.href = data.authUrl;
     } catch (error) {
       console.error('Error initiating Google OAuth:', error);
+      if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+        throw new Error(`Cannot connect to backend server at ${API_URL}. Please ensure the backend is running.`);
+      }
       throw error;
     }
   }

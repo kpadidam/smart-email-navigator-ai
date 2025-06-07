@@ -64,8 +64,8 @@ const Login = () => {
     } catch (error) {
       console.error("Google login error:", error);
       toast({
-        title: "Error",
-        description: "Failed to initiate Google login. Please try again.",
+        title: "Connection Error",
+        description: error instanceof Error ? error.message : "Failed to initiate Google login. Please try again.",
         variant: "destructive",
       });
       setIsLoading(false);
