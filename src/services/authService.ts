@@ -1,4 +1,5 @@
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001';
 
 export interface User {
   id: string;
@@ -55,7 +56,7 @@ class AuthService {
     } catch (error) {
       console.error('Error initiating Google OAuth:', error);
       if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
-        throw new Error(`Cannot connect to backend server at ${API_URL}. Please ensure the backend is running.`);
+        throw new Error(`Cannot connect to backend server at ${API_URL}. Please ensure the backend is running on port 5001.`);
       }
       throw error;
     }

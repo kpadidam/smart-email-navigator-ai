@@ -1,3 +1,4 @@
+
 import express from 'express';                                                                                                                                                                         
 import cors from 'cors';                                                                                                                                                                               
 import helmet from 'helmet';                                                                                                                                                                           
@@ -22,7 +23,7 @@ dotenv.config();
                                                                                                                                                                                                        
 const app = express();                                                                                                                                                                                 
 const server = createServer(app);                                                                                                                                                                      
-const PORT = process.env.PORT || 3001;                                                                                                                                                                 
+const PORT = process.env.PORT || 5001;                                                                                                                                                                 
                                                                                                                                                                                                        
 // Initialize Socket.IO                                                                                                                                                                                
 const io = new Server(server, {                                                                                                                                                                        
