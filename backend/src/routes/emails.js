@@ -142,7 +142,68 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Get single email by ID
+// Get email statistics
+router.get('/stats', async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    const [totalEmails, unreadEmails, categorizedEmails, pendingActions] = await Promise.all([
+      Email.countDocuments({ userId }),
+      Email.countDocuments({ userId, isRead: false }),
+      Email.countDocuments({ userId, 'aiAnalysis.category': { $exists: true, $ne: null } }),
+      Email.countDocuments({ userId, isRead: false, isStarred: false })
+    ]);
+
+    const stats = {
+      totalEmails,
+      unreadEmails,
+      categorizedEmails,
+      pendingActions
+    };
+
+    res.json(stats);
+  } catch (error) {
+    logger.error('Error fetching email stats:', error);
+    res.status(500).json({ error: 'Failed to fetch email statistics' });
+  }
+});
+
+// Get category counts
+router.get('/categories', async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    const categoryCounts = await Email.aggregate([
+      { $match: { userId } },
+      { $group: { _id: '$aiAnalysis.category', count: { $sum: 1 } } },
+      { $project: { category: '$_id', count: 1, _id: 0 } },
+      { $sort: { count: -1 } }
+    ]);
+
+    res.json(categoryCounts);
+  } catch (error) {
+    logger.error('Error fetching category counts:', error);
+    res.status(500).json({ error: 'Failed to fetch category counts' });
+  }
+});
+
+// Check Gmail connection status
+router.get('/gmail/status', async (req, res) => {
+  try {
+    const user = req.user;
+    
+    res.json({
+      connected: user.gmailConnected || false,
+      connectedAt: user.gmailConnectedAt,
+      hasTokens: !!(user.gmailTokens && user.gmailTokens.access_token)
+    });
+  } catch (error) {
+    logger.error('Error checking Gmail status:', error);
+    res.status(500).json({ error: 'Failed to check Gmail status' });
+  }
+});
+
+// Get single email by ID (must be after specific routes)
 router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -205,67 +266,6 @@ router.patch('/:id', async (req, res) => {
   } catch (error) {
     logger.error('Error updating email:', error);
     res.status(500).json({ error: 'Failed to update email' });
-  }
-});
-
-// Get email statistics
-router.get('/stats', async (req, res) => {
-  try {
-    const userId = req.user._id;
-
-    const [totalEmails, unreadEmails, categorizedEmails, pendingActions] = await Promise.all([
-      Email.countDocuments({ userId }),
-      Email.countDocuments({ userId, isRead: false }),
-      Email.countDocuments({ userId, 'aiAnalysis.category': { $exists: true, $ne: null } }),
-      Email.countDocuments({ userId, isRead: false, isStarred: false })
-    ]);
-
-    const stats = {
-      totalEmails,
-      unreadEmails,
-      categorizedEmails,
-      pendingActions
-    };
-
-    res.json(stats);
-  } catch (error) {
-    logger.error('Error fetching email stats:', error);
-    res.status(500).json({ error: 'Failed to fetch email statistics' });
-  }
-});
-
-// Get category counts
-router.get('/categories', async (req, res) => {
-  try {
-    const userId = req.user._id;
-
-    const categoryCounts = await Email.aggregate([
-      { $match: { userId } },
-      { $group: { _id: '$aiAnalysis.category', count: { $sum: 1 } } },
-      { $project: { category: '$_id', count: 1, _id: 0 } },
-      { $sort: { count: -1 } }
-    ]);
-
-    res.json(categoryCounts);
-  } catch (error) {
-    logger.error('Error fetching category counts:', error);
-    res.status(500).json({ error: 'Failed to fetch category counts' });
-  }
-});
-
-// Check Gmail connection status
-router.get('/gmail/status', async (req, res) => {
-  try {
-    const user = req.user;
-    
-    res.json({
-      connected: user.gmailConnected || false,
-      connectedAt: user.gmailConnectedAt,
-      hasTokens: !!(user.gmailTokens && user.gmailTokens.access_token)
-    });
-  } catch (error) {
-    logger.error('Error checking Gmail status:', error);
-    res.status(500).json({ error: 'Failed to check Gmail status' });
   }
 });
 
