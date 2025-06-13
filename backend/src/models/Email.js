@@ -3,18 +3,22 @@ import mongoose from 'mongoose';
 const emailSchema = new mongoose.Schema({
   emailAccountId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'EmailAccount',
-    required: true
+    ref: 'EmailAccount'
   },
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true
   },
-  messageId: {
+  gmailId: {
     type: String,
     required: true,
     unique: true
+  },
+  messageId: {
+    type: String,
+    unique: true,
+    sparse: true
   },
   threadId: String,
   subject: {
@@ -54,6 +58,8 @@ const emailSchema = new mongoose.Schema({
     attachmentId: String
   }],
   labels: [String],
+  labelIds: [String],
+  snippet: String,
   isRead: {
     type: Boolean,
     default: false
@@ -95,6 +101,8 @@ const emailSchema = new mongoose.Schema({
 // Indexes for efficient queries
 emailSchema.index({ userId: 1, receivedAt: -1 });
 emailSchema.index({ emailAccountId: 1, receivedAt: -1 });
+emailSchema.index({ gmailId: 1 });
+emailSchema.index({ userId: 1, gmailId: 1 });
 emailSchema.index({ 'from.email': 1 });
 emailSchema.index({ 'aiAnalysis.category': 1 });
 emailSchema.index({ 'aiAnalysis.priority': 1 });

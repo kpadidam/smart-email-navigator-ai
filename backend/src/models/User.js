@@ -25,9 +25,26 @@ const userSchema = new mongoose.Schema({
       'Please enter a valid email'
     ]
   },
+  name: {
+    type: String,
+    trim: true,
+    maxlength: [100, 'Name cannot be more than 100 characters']
+  },
+  picture: {
+    type: String,
+    trim: true
+  },
+  googleId: {
+    type: String,
+    unique: true,
+    sparse: true
+  },
   password: {
     type: String,
-    required: [true, 'Password is required'],
+    required: function() {
+      // Password is only required if user doesn't have googleId (not OAuth user)
+      return !this.googleId;
+    },
     minlength: [6, 'Password must be at least 6 characters'],
     select: false
   },

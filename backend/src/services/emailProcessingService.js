@@ -1,401 +1,200 @@
-import { gmailSyncService } from './gmailSyncService.js';
-import { emailCategorizationService } from './emailCategorizationService.js';
-import { realtimeEmailService } from './realtimeEmailService.js';
-import EmailAccount from '../models/EmailAccount.js';
+import { logger } from '../utils/logger.js';
 import Email from '../models/Email.js';
-import { logger, logInfo, logError } from '../utils/logger.js';
 
+/**
+ * Email Processing Service for AI categorization and analysis
+ */
 class EmailProcessingService {
-  constructor() {
-    this.processingQueue = new Map(); // Track processing jobs
-  }
-
-  // Main orchestration method for email processing
-  async processUserEmails(userId, options = {}) {
+  
+  /**
+   * Categorize email based on content analysis
+   * @param {Object} emailData - Email data to analyze
+   * @returns {Object} AI analysis results
+   */
+  async categorizeEmail(emailData) {
     try {
-      const {
-        accountId = null,
-        forceSync = false,
-        categorizeOnly = false
-      } = options;
-
-      logInfo('Starting email processing', { userId, options });
-
-      // Get user's email accounts
-      const accounts = accountId 
-        ? [await EmailAccount.findOne({ _id: accountId, userId, isActive: true })]
-        : await EmailAccount.find({ userId, isActive: true, 'syncSettings.enabled': true });
-
-      if (!accounts.length || (accountId && !accounts[0])) {
-        throw new Error('No active email accounts found');
-      }
-
-      const results = [];
-
-      for (const account of accounts) {
-        try {
-          let result;
-          
-          if (categorizeOnly) {
-            // Only re-categorize existing emails
-            result = await this.recategorizeAccountEmails(userId, account._id);
-          } else {
-            // Full sync and processing
-            result = await this.processAccountEmails(userId, account._id, forceSync);
-          }
-          
-          results.push({
-            accountId: account._id,
-            emailAddress: account.emailAddress,
-            ...result
-          });
-        } catch (error) {
-          logError(error, { 
-            userId, 
-            accountId: account._id,
-            service: 'EmailProcessingService.processUserEmails' 
-          });
-          
-          results.push({
-            accountId: account._id,
-            emailAddress: account.emailAddress,
-            status: 'error',
-            error: error.message
-          });
-        }
-      }
-
-      // Update overall dashboard statistics
-      await this.updateUserDashboard(userId);
-
-      logInfo('Email processing completed', { userId, results });
-      return results;
-
-    } catch (error) {
-      logError(error, { userId, service: 'EmailProcessingService.processUserEmails' });
-      throw error;
-    }
-  }
-
-  // Process emails for a specific account
-  async processAccountEmails(userId, accountId, forceSync = false) {
-    try {
-      const account = await EmailAccount.findById(accountId);
+      const { subject, from, body } = emailData;
+      const content = `${subject} ${body.text || body.html || ''}`.toLowerCase();
       
-      if (!account) {
-        throw new Error('Email account not found');
-      }
-
-      // Check if sync is needed
-      if (!forceSync && !account.isSyncDue()) {
-        logInfo('Account sync not due, skipping', { userId, accountId });
-        return { status: 'skipped', reason: 'sync_not_due' };
-      }
-
-      // Sync emails from Gmail
-      const syncResult = await gmailSyncService.syncAccount(userId, accountId);
+      // Simple rule-based categorization (can be enhanced with actual AI/ML)
+      let category = 'other';
+      let priority = 'medium';
+      let sentiment = 'neutral';
       
-      if (syncResult.status === 'error') {
-        throw new Error(syncResult.error || 'Email sync failed');
+      // Category detection
+      if (this.isWorkEmail(content, from)) {
+        category = 'work';
+        priority = 'high';
+      } else if (this.isPromotionalEmail(content, from)) {
+        category = 'promotional';
+        priority = 'low';
+      } else if (this.isSocialEmail(content, from)) {
+        category = 'social';
+        priority = 'low';
+      } else if (this.isUpdateEmail(content, from)) {
+        category = 'updates';
+        priority = 'medium';
+      } else if (this.isPersonalEmail(content, from)) {
+        category = 'personal';
+        priority = 'high';
       }
-
-      // If no new emails, return early
-      if (syncResult.count === 0) {
-        return { 
-          status: 'completed', 
-          newEmails: 0,
-          message: 'No new emails to process'
-        };
-      }
-
-      // Get recently synced emails for categorization
-      const recentEmails = await Email.find({
-        userId,
-        createdAt: { $gte: new Date(Date.now() - 60000) } // Last minute
-      }).limit(syncResult.count);
-
-      // Categorize and prioritize emails
-      await this.categorizeEmails(userId, recentEmails);
-
-      return {
-        status: 'completed',
-        newEmails: syncResult.count,
-        totalEmails: syncResult.totalEmails,
-        unreadEmails: syncResult.unreadEmails
-      };
-
-    } catch (error) {
-      logError(error, { 
-        userId, 
-        accountId, 
-        service: 'EmailProcessingService.processAccountEmails' 
-      });
-      throw error;
-    }
-  }
-
-  // Categorize and prioritize emails
-  async categorizeEmails(userId, emails) {
-    try {
-      if (!emails.length) return;
-
-      logInfo('Starting email categorization', { userId, count: emails.length });
-
-      const batchSize = 10;
-      let processedCount = 0;
-
-      for (let i = 0; i < emails.length; i += batchSize) {
-        const batch = emails.slice(i, i + batchSize);
-        
-        // Categorize batch
-        const categorizations = await emailCategorizationService.categorizeEmailBatch(batch);
-        
-        // Update emails with categorization results
-        for (const result of categorizations) {
-          try {
-            const email = await Email.findById(result.emailId);
-            if (email) {
-              const oldCategory = email.category;
-              const oldPriority = email.priority;
-              
-              email.category = result.category;
-              email.priority = result.priority;
-              
-              // Store categorization metadata
-              email.metadata = {
-                ...email.metadata,
-                categoryConfidence: result.categoryConfidence,
-                priorityConfidence: result.priorityConfidence,
-                categorizationReasons: result.reasons,
-                lastCategorizedAt: new Date()
-              };
-              
-              await email.save();
-              
-              // Emit real-time updates if category or priority changed
-              if (oldCategory !== result.category) {
-                await realtimeEmailService.updateEmailCategory(
-                  userId, 
-                  email._id, 
-                  oldCategory, 
-                  result.category, 
-                  result.categoryConfidence
-                );
-              }
-              
-              if (oldPriority !== result.priority) {
-                await realtimeEmailService.updateEmailPriority(
-                  userId, 
-                  email._id, 
-                  result.priority, 
-                  result.reasons.priority.join(', ')
-                );
-              }
-              
-              processedCount++;
-            }
-          } catch (emailError) {
-            logError(emailError, { 
-              userId, 
-              emailId: result.emailId,
-              service: 'EmailProcessingService.categorizeEmails.updateEmail' 
-            });
-          }
-        }
-      }
-
-      logInfo('Email categorization completed', { 
-        userId, 
-        processedCount,
-        totalEmails: emails.length 
-      });
-
-      return { processedCount, totalEmails: emails.length };
-
-    } catch (error) {
-      logError(error, { 
-        userId, 
-        emailCount: emails.length,
-        service: 'EmailProcessingService.categorizeEmails' 
-      });
-      throw error;
-    }
-  }
-
-  // Re-categorize existing emails for an account
-  async recategorizeAccountEmails(userId, accountId) {
-    try {
-      logInfo('Starting email re-categorization', { userId, accountId });
-
-      // Get all emails for the account
-      const emails = await Email.find({ userId }).limit(1000); // Limit for performance
       
-      if (!emails.length) {
-        return { status: 'completed', message: 'No emails to categorize' };
+      // Priority detection
+      if (this.isUrgentEmail(content, subject)) {
+        priority = 'high';
       }
-
-      // Categorize emails
-      const result = await this.categorizeEmails(userId, emails);
+      
+      // Sentiment analysis (basic)
+      sentiment = this.analyzeSentiment(content);
+      
+      // Generate summary
+      const summary = this.generateSummary(subject, body.text || body.html || '');
+      
+      // Extract action items
+      const actionItems = this.extractActionItems(content);
       
       return {
-        status: 'completed',
-        recategorizedEmails: result.processedCount,
-        totalEmails: result.totalEmails
+        category,
+        priority,
+        sentiment,
+        summary,
+        actionItems,
+        confidence: 0.8, // Static confidence for now
+        processedAt: new Date()
       };
-
-    } catch (error) {
-      logError(error, { 
-        userId, 
-        accountId,
-        service: 'EmailProcessingService.recategorizeAccountEmails' 
-      });
-      throw error;
-    }
-  }
-
-  // Update user's dashboard statistics
-  async updateUserDashboard(userId) {
-    try {
-      // Calculate statistics
-      const totalEmails = await Email.countDocuments({ userId });
-      const unreadEmails = await Email.countDocuments({ userId, isRead: false });
-      const starredEmails = await Email.countDocuments({ userId, isStarred: true });
-      const importantEmails = await Email.countDocuments({ userId, isImportant: true });
-
-      // Category breakdown
-      const categoryStats = await Email.aggregate([
-        { $match: { userId } },
-        { $group: { _id: '$category', count: { $sum: 1 } } }
-      ]);
-
-      const categories = {};
-      categoryStats.forEach(stat => {
-        categories[stat._id] = stat.count;
-      });
-
-      // Priority breakdown
-      const priorityStats = await Email.aggregate([
-        { $match: { userId } },
-        { $group: { _id: '$priority', count: { $sum: 1 } } }
-      ]);
-
-      const priorities = {};
-      priorityStats.forEach(stat => {
-        priorities[stat._id] = stat.count;
-      });
-
-      // Recent activity (last 24 hours)
-      const recentEmails = await Email.countDocuments({
-        userId,
-        receivedAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) }
-      });
-
-      const dashboardStats = {
-        totalEmails,
-        unreadEmails,
-        starredEmails,
-        importantEmails,
-        categories,
-        priorities,
-        recentEmails,
-        lastUpdated: new Date()
-      };
-
-      // Emit dashboard update
-      await realtimeEmailService.updateDashboard(userId, dashboardStats);
-
-      logInfo('Dashboard statistics updated', { userId, dashboardStats });
-      return dashboardStats;
-
-    } catch (error) {
-      logError(error, { 
-        userId,
-        service: 'EmailProcessingService.updateUserDashboard' 
-      });
-      throw error;
-    }
-  }
-
-  // Schedule email processing for a user
-  async scheduleEmailProcessing(userId, options = {}) {
-    try {
-      const jobId = `${userId}-${Date.now()}`;
       
-      // Add to processing queue
-      this.processingQueue.set(jobId, {
-        userId,
-        options,
-        status: 'queued',
-        createdAt: new Date()
-      });
-
-      // Process asynchronously
-      setImmediate(async () => {
-        try {
-          this.processingQueue.set(jobId, {
-            ...this.processingQueue.get(jobId),
-            status: 'processing',
-            startedAt: new Date()
-          });
-
-          const result = await this.processUserEmails(userId, options);
-          
-          this.processingQueue.set(jobId, {
-            ...this.processingQueue.get(jobId),
-            status: 'completed',
-            completedAt: new Date(),
-            result
-          });
-
-          // Clean up old jobs after 1 hour
-          setTimeout(() => {
-            this.processingQueue.delete(jobId);
-          }, 60 * 60 * 1000);
-
-        } catch (error) {
-          this.processingQueue.set(jobId, {
-            ...this.processingQueue.get(jobId),
-            status: 'error',
-            error: error.message,
-            completedAt: new Date()
-          });
-
-          logError(error, { 
-            userId, 
-            jobId,
-            service: 'EmailProcessingService.scheduleEmailProcessing' 
-          });
-        }
-      });
-
-      return { jobId, status: 'queued' };
-
     } catch (error) {
-      logError(error, { 
-        userId,
-        service: 'EmailProcessingService.scheduleEmailProcessing' 
-      });
-      throw error;
+      logger.error('Error categorizing email:', error);
+      return {
+        category: 'other',
+        priority: 'medium',
+        sentiment: 'neutral',
+        summary: emailData.subject || 'No subject',
+        actionItems: [],
+        confidence: 0.1,
+        processedAt: new Date()
+      };
     }
   }
-
-  // Get processing job status
-  getJobStatus(jobId) {
-    return this.processingQueue.get(jobId) || { status: 'not_found' };
-  }
-
-  // Get processing statistics
-  getProcessingStats() {
-    const jobs = Array.from(this.processingQueue.values());
+  
+  /**
+   * Process multiple emails for AI analysis
+   * @param {Array} emails - Array of email objects
+   * @returns {Array} Processed emails with AI analysis
+   */
+  async processEmails(emails) {
+    const processedEmails = [];
     
-    return {
-      totalJobs: jobs.length,
-      queued: jobs.filter(job => job.status === 'queued').length,
-      processing: jobs.filter(job => job.status === 'processing').length,
-      completed: jobs.filter(job => job.status === 'completed').length,
-      errors: jobs.filter(job => job.status === 'error').length
-    };
+    for (const email of emails) {
+      try {
+        const aiAnalysis = await this.categorizeEmail(email);
+        
+        // Update email in database
+        await Email.findByIdAndUpdate(email._id, { aiAnalysis });
+        
+        processedEmails.push({
+          ...email.toObject(),
+          aiAnalysis
+        });
+        
+        logger.info('Email processed', { emailId: email._id, category: aiAnalysis.category });
+      } catch (error) {
+        logger.error('Error processing email:', { emailId: email._id, error: error.message });
+        processedEmails.push(email);
+      }
+    }
+    
+    return processedEmails;
+  }
+  
+  // Helper methods for categorization
+  isWorkEmail(content, from) {
+    const workKeywords = ['meeting', 'project', 'deadline', 'report', 'presentation', 'client', 'team', 'work', 'office', 'business'];
+    const workDomains = ['company.com', 'corp.com', 'inc.com', 'ltd.com'];
+    
+    return workKeywords.some(keyword => content.includes(keyword)) ||
+           workDomains.some(domain => from.email?.includes(domain));
+  }
+  
+  isPromotionalEmail(content, from) {
+    const promoKeywords = ['sale', 'discount', 'offer', 'deal', 'promotion', 'coupon', 'free', 'limited time', 'buy now', 'shop'];
+    const promoSenders = ['noreply', 'marketing', 'promo', 'deals', 'offers'];
+    
+    return promoKeywords.some(keyword => content.includes(keyword)) ||
+           promoSenders.some(sender => from.email?.includes(sender));
+  }
+  
+  isSocialEmail(content, from) {
+    const socialKeywords = ['facebook', 'twitter', 'instagram', 'linkedin', 'social', 'friend', 'follow', 'like', 'share'];
+    const socialDomains = ['facebook.com', 'twitter.com', 'instagram.com', 'linkedin.com'];
+    
+    return socialKeywords.some(keyword => content.includes(keyword)) ||
+           socialDomains.some(domain => from.email?.includes(domain));
+  }
+  
+  isUpdateEmail(content, from) {
+    const updateKeywords = ['update', 'notification', 'alert', 'news', 'announcement', 'changelog', 'version'];
+    const updateSenders = ['updates', 'notifications', 'alerts', 'news'];
+    
+    return updateKeywords.some(keyword => content.includes(keyword)) ||
+           updateSenders.some(sender => from.email?.includes(sender));
+  }
+  
+  isPersonalEmail(content, from) {
+    const personalKeywords = ['family', 'friend', 'personal', 'birthday', 'wedding', 'vacation', 'dinner', 'lunch'];
+    
+    return personalKeywords.some(keyword => content.includes(keyword));
+  }
+  
+  isUrgentEmail(content, subject) {
+    const urgentKeywords = ['urgent', 'asap', 'immediate', 'emergency', 'critical', 'important', 'deadline', 'today'];
+    
+    return urgentKeywords.some(keyword => content.includes(keyword) || subject?.toLowerCase().includes(keyword));
+  }
+  
+  analyzeSentiment(content) {
+    const positiveWords = ['great', 'excellent', 'good', 'happy', 'pleased', 'wonderful', 'amazing', 'fantastic'];
+    const negativeWords = ['bad', 'terrible', 'awful', 'disappointed', 'angry', 'frustrated', 'problem', 'issue'];
+    
+    const positiveCount = positiveWords.filter(word => content.includes(word)).length;
+    const negativeCount = negativeWords.filter(word => content.includes(word)).length;
+    
+    if (positiveCount > negativeCount) return 'positive';
+    if (negativeCount > positiveCount) return 'negative';
+    return 'neutral';
+  }
+  
+  generateSummary(subject, body) {
+    if (!body || body.length < 50) {
+      return subject || 'No content available';
+    }
+    
+    // Simple summary: first sentence or first 100 characters
+    const firstSentence = body.split('.')[0];
+    if (firstSentence.length > 10 && firstSentence.length < 150) {
+      return firstSentence.trim() + '.';
+    }
+    
+    return body.substring(0, 100).trim() + '...';
+  }
+  
+  extractActionItems(content) {
+    const actionKeywords = ['please', 'need to', 'should', 'must', 'required', 'deadline', 'due', 'action', 'todo'];
+    const actionItems = [];
+    
+    const sentences = content.split(/[.!?]+/);
+    
+    for (const sentence of sentences) {
+      if (actionKeywords.some(keyword => sentence.toLowerCase().includes(keyword))) {
+        const cleanSentence = sentence.trim();
+        if (cleanSentence.length > 10 && cleanSentence.length < 200) {
+          actionItems.push(cleanSentence);
+        }
+      }
+    }
+    
+    return actionItems.slice(0, 3); // Limit to 3 action items
   }
 }
 
-export const emailProcessingService = new EmailProcessingService();
+export default new EmailProcessingService();
