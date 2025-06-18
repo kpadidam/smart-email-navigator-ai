@@ -1,17 +1,19 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Calendar, Package, Briefcase, Mail } from "lucide-react";
+import { Calendar, Package, Briefcase, Mail, AlertCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
 import { emailService, Email } from "@/services/emailService";
+import { authService } from "@/services/authService";
 
 interface EmailListProps {
   selectedCategory: string;
   searchTerm: string;
+  refreshTrigger?: number;
 }
 
-const EmailList = ({ selectedCategory, searchTerm }: EmailListProps) => {
+const EmailList = ({ selectedCategory, searchTerm, refreshTrigger }: EmailListProps) => {
   const navigate = useNavigate();
   const [emails, setEmails] = useState<Email[]>([]);
   const [loading, setLoading] = useState(true);
@@ -19,18 +21,40 @@ const EmailList = ({ selectedCategory, searchTerm }: EmailListProps) => {
 
   useEffect(() => {
     const loadEmails = async () => {
+      console.log('Loading emails...');
+      console.log('Auth status:', authService.isAuthenticated());
+      console.log('Auth token:', !!authService.getToken());
+      
+      setLoading(true);
+      setError(null);
+      
       try {
+        if (!authService.isAuthenticated()) {
+          throw new Error('Not authenticated');
+        }
+
         const data = await emailService.fetchEmails();
+        console.log('Emails loaded:', data);
         setEmails(data);
       } catch (err) {
-        setError('Failed to load emails');
-        console.error(err);
+        console.error('Error loading emails:', err);
+        
+        if (err instanceof Error && err.message.includes('Failed to fetch')) {
+          setError('Cannot connect to server. Please ensure the backend is running on port 5001.');
+        } else if (err instanceof Error && err.message.includes('Not authenticated')) {
+          setError('Authentication required. Please log in again.');
+          // Redirect to login after a short delay
+          setTimeout(() => navigate('/login'), 2000);
+        } else {
+          setError(err instanceof Error ? err.message : 'Failed to load emails');
+        }
       } finally {
         setLoading(false);
       }
     };
+    
     loadEmails();
-  }, []);
+  }, [navigate, refreshTrigger]);
 
   const getCategoryIcon = (category: string) => {
     switch (category) {
@@ -71,11 +95,29 @@ const EmailList = ({ selectedCategory, searchTerm }: EmailListProps) => {
   });
 
   if (loading) {
-    return <div>Loading emails...</div>;
+    return (
+      <Card>
+        <CardContent className="p-8 text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4"></div>
+          <p>Loading emails...</p>
+        </CardContent>
+      </Card>
+    );
   }
 
   if (error) {
-    return <div>Error: {error}</div>;
+    return (
+      <Card>
+        <CardContent className="p-8 text-center">
+          <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Error Loading Emails</h3>
+          <p className="text-red-600 mb-4">{error}</p>
+          <Button onClick={() => window.location.reload()}>
+            Try Again
+          </Button>
+        </CardContent>
+      </Card>
+    );
   }
 
   return (
@@ -158,13 +200,16 @@ const EmailList = ({ selectedCategory, searchTerm }: EmailListProps) => {
         );
       })}
       
-      {filteredEmails.length === 0 && (
+      {filteredEmails.length === 0 && !loading && !error && (
         <Card>
           <CardContent className="p-8 text-center">
             <Mail className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">No emails found</h3>
-            <p className="text-gray-500">
-              Try adjusting your search terms or selected category.
+            <p className="text-gray-500 mb-4">
+              {emails.length === 0 
+                ? "Try syncing your emails first to see them here." 
+                : "Try adjusting your search terms or selected category."
+              }
             </p>
           </CardContent>
         </Card>

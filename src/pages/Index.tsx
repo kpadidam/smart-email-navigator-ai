@@ -4,19 +4,29 @@ import StatsCards from "../components/StatsCards";
 import CategoryFilter from "../components/CategoryFilter";
 import SearchBar from "../components/SearchBar";
 import EmailList from "../components/EmailList";
+import EmailSyncButton from "../components/EmailSyncButton";
 import { useState } from "react";
 
 const Index = () => {
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  const handleSyncComplete = () => {
+    // Trigger a refresh of the email list
+    setRefreshTrigger(prev => prev + 1);
+  };
 
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Smart Email Tracker</h1>
-          <p className="text-gray-600">AI-powered email categorization and tracking</p>
+        <div className="mb-8 flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Smart Email Tracker</h1>
+            <p className="text-gray-600">AI-powered email categorization and tracking</p>
+          </div>
+          <EmailSyncButton onSyncComplete={handleSyncComplete} />
         </div>
         
         <StatsCards />
@@ -40,6 +50,7 @@ const Index = () => {
             <EmailList 
               selectedCategory={selectedCategory}
               searchTerm={searchTerm}
+              refreshTrigger={refreshTrigger}
             />
           </div>
         </div>
