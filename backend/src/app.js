@@ -1,4 +1,3 @@
-
 import express from 'express';                                                                                                                                                                         
 import cors from 'cors';                                                                                                                                                                               
 import helmet from 'helmet';                                                                                                                                                                           
@@ -22,16 +21,29 @@ import { handleEmailSocket } from './sockets/emailSocket.js';
 dotenv.config();                                                                                                                                                                                       
                                                                                                                                                                                                        
 const app = express();                                                                                                                                                                                 
-const server = createServer(app);                                                                                                                                                                      
-const PORT = process.env.PORT || 5001;                                                                                                                                                                 
+const httpServer = createServer(app);                                                                                                                                                                      
                                                                                                                                                                                                        
-// Initialize Socket.IO                                                                                                                                                                                
-const io = new Server(server, {                                                                                                                                                                        
-  cors: {                                                                                                                                                                                              
-    origin: process.env.FRONTEND_URL || 'http://localhost:5173',                                                                                                                                       
+// CORS configuration - Updated to include all frontend origins                                                                                                                                       
+const corsOptions = {                                                                                                                                                                                  
+  origin: [                                                                                                                                                                                              
+    'http://localhost:8080',                                                                                                                                                                              
+    'http://localhost:8081',                                                                                                                                                                              
+    'http://localhost:8081',                                                                                                                                                                              
+    'http://10.0.0.131:8080',                                                                                                                                                                              
+    'http://10.0.0.131:8081',                                                                                                                                                                              
+    'http://10.0.0.131:8081',                                                                                                                                                                              
+    process.env.FRONTEND_URL                                                                                                                                                                              
+  ].filter(Boolean),                                                                                                                                                                                      
+  methods: ['GET', 'POST', 'OPTIONS'],                                                                                                                                                                  
+  allowedHeaders: ['Content-Type', 'Authorization'],                                                                                                                                                      
     credentials: true,                                                                                                                                                                                 
-    methods: ["GET", "POST"]                                                                                                                                                                           
-  }                                                                                                                                                                                                    
+  preflightContinue: false,                                                                                                                                                                              
+  optionsSuccessStatus: 204                                                                                                                                                                              
+};                                                                                                                                                                                                     
+                                                                                                                                                                                                       
+// Initialize Socket.IO with CORS                                                                                                                                                                        
+const io = new Server(httpServer, {                                                                                                                                                                        
+  cors: corsOptions                                                                                                                                                                                      
 });                                                                                                                                                                                                    
                                                                                                                                                                                                        
 // Socket.IO authentication middleware                                                                                                                                                                 
@@ -44,14 +56,31 @@ io.on('connection', (socket) => {
 });                                                                                                                                                                                                    
                                                                                                                                                                                                        
 // Export io instance for use in other modules                                                                                                                                                         
-let ioInstance = io;                                                                                                                                                                                   
-export const getIO = () => ioInstance;                                                                                                                                                                 
+export const getIO = () => io;                                                                                                                                                                              
+                                                                                                                                                                                                       
+// Request logging middleware                                                                                                                                                                           
+app.use((req, res, next) => {                                                                                                                                                                           
+  logger.info(`${req.method} ${req.url}`, {                                                                                                                                                             
+    method: req.method,                                                                                                                                                                                  
+    url: req.url,                                                                                                                                                                                        
+    query: req.query,                                                                                                                                                                                      
+    body: req.method !== 'GET' ? req.body : undefined,                                                                                                                                                    
+    headers: {                                                                                                                                                                                            
+      origin: req.headers.origin,                                                                                                                                                                            
+      referer: req.headers.referer,                                                                                                                                                                            
+      userAgent: req.headers['user-agent']                                                                                                                                                                            
+    }                                                                                                                                                                                                    
+  });                                                                                                                                                                                                    
+  next();                                                                                                                                                                                                
+});                                                                                                                                                                                                    
+                                                                                                                                                                                                       
+// Apply CORS before other middleware                                                                                                                                                                    
+app.use(cors(corsOptions));                                                                                                                                                                              
                                                                                                                                                                                                        
 // Security middleware                                                                                                                                                                                 
-app.use(helmet());                                                                                                                                                                                     
-app.use(cors({                                                                                                                                                                                         
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',                                                                                                                                         
-  credentials: true                                                                                                                                                                                    
+app.use(helmet({                                                                                                                                                                                         
+  crossOriginResourcePolicy: { policy: "cross-origin" },                                                                                                                                                      
+  crossOriginOpenerPolicy: { policy: "unsafe-none" }                                                                                                                                                      
 }));                                                                                                                                                                                                   
                                                                                                                                                                                                        
 // Rate limiting                                                                                                                                                                                       
@@ -90,12 +119,13 @@ app.use(errorHandler);
                                                                                                                                                                                                        
 // 404 handler                                                                                                                                                                                         
 app.use('*', (req, res) => {                                                                                                                                                                           
+  logger.warn(`Route not found: ${req.method} ${req.originalUrl}`);                                                                                                                                      
   res.status(404).json({ error: 'Route not found' });                                                                                                                                                  
 });                                                                                                                                                                                                    
                                                                                                                                                                                                        
-// Use server.listen instead of app.listen for Socket.IO                                                                                                                                               
-server.listen(PORT, () => {                                                                                                                                                                            
-  logger.info(`Server running on port ${PORT}`);                                                                                                                                                       
+const PORT = process.env.PORT || 5001;                                                                                                                                                                 
+httpServer.listen(PORT, () => {                                                                                                                                                                            
+  logger.info(`Server is running on port ${PORT}`);                                                                                                                                                       
   logger.info(`Socket.IO server initialized`);                                                                                                                                                         
 });                                                                                                                                                                                                    
                                                                                                                                                                                                        

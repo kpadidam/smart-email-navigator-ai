@@ -18,19 +18,74 @@ const Login = () => {
       return;
     }
 
-    // Handle OAuth callback
-    const code = searchParams.get("code");
+    // Handle OAuth callback from Google redirect
+    const token = searchParams.get("token");
+    const userParam = searchParams.get("user");
     const error = searchParams.get("error");
 
     if (error) {
+      let errorMessage = "Failed to authenticate with Google. Please try again.";
+      
+      switch (error) {
+        case "no_code":
+          errorMessage = "No authorization code received from Google.";
+          break;
+        case "server_config":
+          errorMessage = "Server configuration error. Please contact support.";
+          break;
+        case "auth_failed":
+          errorMessage = "Authentication failed. Please try again.";
+          break;
+        default:
+          errorMessage = `Authentication error: ${error}`;
+      }
+
       toast({
         title: "Authentication Error",
-        description: "Failed to authenticate with Google. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
+      
+      // Clear error from URL
+      const newUrl = new URL(window.location.href);
+      newUrl.searchParams.delete("error");
+      window.history.replaceState({}, "", newUrl.toString());
       return;
     }
 
+    if (token && userParam) {
+      try {
+        const user = JSON.parse(decodeURIComponent(userParam));
+        
+        // Store the token and user data
+        localStorage.setItem('authToken', token);
+        localStorage.setItem('user', JSON.stringify(user));
+        
+        toast({
+          title: "Success",
+          description: "Successfully authenticated with Google!",
+        });
+        
+        // Clear parameters from URL and navigate to dashboard
+        const newUrl = new URL(window.location.href);
+        newUrl.searchParams.delete("token");
+        newUrl.searchParams.delete("user");
+        window.history.replaceState({}, "", newUrl.toString());
+        
+        navigate("/");
+      } catch (parseError) {
+        console.error("Error parsing user data:", parseError);
+        toast({
+          title: "Authentication Error",
+          description: "Failed to process authentication data. Please try again.",
+          variant: "destructive",
+        });
+      }
+      return;
+    }
+
+    // Handle legacy OAuth callback (if using POST method)
+    const code = searchParams.get("code");
     if (code) {
       handleOAuthCallback(code);
     }
