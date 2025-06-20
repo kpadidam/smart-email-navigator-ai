@@ -57,9 +57,8 @@ const Login = () => {
       try {
         const user = JSON.parse(decodeURIComponent(userParam));
         
-        // Store the token and user data
-        localStorage.setItem('authToken', token);
-        localStorage.setItem('user', JSON.stringify(user));
+        // Use AuthService to properly set authentication data
+        authService.setAuthData(token, user);
         
         toast({
           title: "Success",

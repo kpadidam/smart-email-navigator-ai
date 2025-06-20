@@ -79,7 +79,7 @@ const emailSchema = new mongoose.Schema({
   aiAnalysis: {
     category: {
       type: String,
-      enum: ['work', 'personal', 'promotional', 'social', 'updates', 'forums', 'spam', 'other']
+      enum: ['meetings', 'delivery', 'interviews', 'other']
     },
     priority: {
       type: String,
@@ -101,7 +101,7 @@ const emailSchema = new mongoose.Schema({
 // Indexes for efficient queries
 emailSchema.index({ userId: 1, receivedAt: -1 });
 emailSchema.index({ emailAccountId: 1, receivedAt: -1 });
-emailSchema.index({ gmailId: 1 });
+// Note: gmailId index is already created by unique: true
 emailSchema.index({ userId: 1, gmailId: 1 });
 emailSchema.index({ 'from.email': 1 });
 emailSchema.index({ 'aiAnalysis.category': 1 });

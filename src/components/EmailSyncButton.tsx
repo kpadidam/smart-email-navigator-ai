@@ -18,9 +18,8 @@ const EmailSyncButton = ({ onSyncComplete }: EmailSyncButtonProps) => {
     try {
       console.log('Starting email sync...');
       
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/emails/sync`, {
+      const response = await authService.makeAuthenticatedRequest(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/emails/sync`, {
         method: 'POST',
-        headers: authService.getAuthHeaders(),
       });
 
       console.log('Sync response status:', response.status);
@@ -34,9 +33,13 @@ const EmailSyncButton = ({ onSyncComplete }: EmailSyncButtonProps) => {
       const result = await response.json();
       console.log('Sync result:', result);
 
+      // Use the backend's informative message and show appropriate status
+      const isUpToDate = result.status === 'up_to_date' || (result.emailsSynced === 0 && result.totalFetched > 0);
+      
       toast({
-        title: "Sync Complete",
-        description: `Successfully synced ${result.emailsSynced || 0} emails`,
+        title: isUpToDate ? "Already Up-to-Date" : "Sync Complete",
+        description: result.message || `Successfully synced ${result.emailsSynced || 0} emails`,
+        variant: isUpToDate ? "default" : "default",
       });
 
       if (onSyncComplete) {

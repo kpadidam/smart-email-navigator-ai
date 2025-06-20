@@ -40,7 +40,8 @@ class GmailService {
    */
   async refreshTokensIfNeeded(user) {
     if (!user.gmailTokens || !user.gmailTokens.refresh_token) {
-      throw new Error('No refresh token available');
+      logger.error('No refresh token available', { userId: user._id });
+      throw new Error('No refresh token available. Please reconnect your Gmail account.');
     }
 
     // Check if token is expired or will expire soon (within 5 minutes)
@@ -48,28 +49,72 @@ class GmailService {
     const expiryTime = user.gmailTokens.expiry_date;
     const fiveMinutes = 5 * 60 * 1000;
 
-    if (expiryTime && now >= (expiryTime - fiveMinutes)) {
+    // Convert expiry_date to timestamp if it's a Date object
+    let expiryTimestamp;
+    if (expiryTime instanceof Date) {
+      expiryTimestamp = expiryTime.getTime();
+    } else if (typeof expiryTime === 'number') {
+      expiryTimestamp = expiryTime;
+    } else {
+      logger.warn('Invalid expiry_date format, forcing refresh', { 
+        userId: user._id, 
+        expiryTime, 
+        type: typeof expiryTime 
+      });
+      expiryTimestamp = 0; // Force refresh
+    }
+
+    if (!expiryTimestamp || now >= (expiryTimestamp - fiveMinutes)) {
       try {
-        this.oauth2Client.setCredentials({
+        logger.info('Refreshing Gmail tokens', { 
+          userId: user._id,
+          expired: !expiryTimestamp || now >= expiryTimestamp,
+          expiryTime: expiryTimestamp ? new Date(expiryTimestamp).toISOString() : 'unknown'
+        });
+
+        // Create a fresh OAuth client for token refresh
+        const refreshClient = new google.auth.OAuth2(
+          process.env.GOOGLE_CLIENT_ID,
+          process.env.GOOGLE_CLIENT_SECRET,
+          process.env.GOOGLE_REDIRECT_URI
+        );
+
+        refreshClient.setCredentials({
           refresh_token: user.gmailTokens.refresh_token
         });
 
-        const { credentials } = await this.oauth2Client.refreshAccessToken();
+        const { credentials } = await refreshClient.refreshAccessToken();
         
         // Update user with new tokens
         const updatedTokens = {
           ...user.gmailTokens,
           access_token: credentials.access_token,
-          expiry_date: credentials.expiry_date
+          expiry_date: credentials.expiry_date || (Date.now() + 3600000) // Default 1 hour if not provided
         };
 
         await User.findByIdAndUpdate(user._id, { gmailTokens: updatedTokens });
         user.gmailTokens = updatedTokens;
 
-        logger.info('Gmail tokens refreshed', { userId: user._id });
+        logger.info('Gmail tokens refreshed successfully', { 
+          userId: user._id,
+          newExpiry: new Date(updatedTokens.expiry_date).toISOString()
+        });
       } catch (error) {
-        logger.error('Failed to refresh Gmail tokens', { userId: user._id, error: error.message });
-        throw new Error('Failed to refresh Gmail tokens');
+        logger.error('Failed to refresh Gmail tokens', { 
+          userId: user._id, 
+          error: error.message,
+          errorCode: error.code,
+          errorDetails: error.response?.data
+        });
+
+        // Provide specific error messages based on error type
+        if (error.message.includes('invalid_grant')) {
+          throw new Error('Gmail refresh token has expired or been revoked. Please reconnect your Gmail account.');
+        } else if (error.message.includes('invalid_client')) {
+          throw new Error('Gmail OAuth configuration error. Please contact support.');
+        } else {
+          throw new Error(`Failed to refresh Gmail tokens: ${error.message}`);
+        }
       }
     }
 

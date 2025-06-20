@@ -1,7 +1,8 @@
 
 import { Button } from "@/components/ui/button";
-import { Settings, Bell, Plus, Check } from "lucide-react";
+import { Settings, Bell, Plus, Check, LogOut } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { authService } from "@/services/authService";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,26 +16,33 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const Header = () => {
   const navigate = useNavigate();
-
-  // Mock email accounts
-  const emailAccounts = [
+  
+  // Get authenticated user data
+  const user = authService.getUser();
+  
+  // Create email account from authenticated user
+  const emailAccounts = user ? [
     {
-      id: 1,
-      email: "john.doe@example.com",
-      name: "John Doe",
+      id: user.id,
+      email: user.email,
+      name: user.name || 'User',
       isDefault: true,
-      avatar: "https://www.svgrepo.com/show/82727/profiles-avatar.svg"
-    },
-    {
-      id: 2,
-      email: "work@company.com",
-      name: "Work Account",
-      isDefault: false,
-      avatar: "https://www.svgrepo.com/show/72894/man-avatar-with-bald-head-sunglasses-and-mustache.svg"
+      avatar: user.picture || null
     }
-  ];
+  ] : [];
 
-  const defaultAccount = emailAccounts.find(account => account.isDefault) || emailAccounts[0];
+  const defaultAccount = emailAccounts[0] || {
+    id: 'default',
+    email: 'user@example.com',
+    name: 'User',
+    isDefault: true,
+    avatar: null
+  };
+
+  const handleLogout = () => {
+    authService.logout();
+    navigate('/login');
+  };
 
   return (
     <header className="bg-white shadow-sm border-b">
@@ -94,26 +102,37 @@ const Header = () => {
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuGroup>
-                  {emailAccounts.map((account) => (
-                    <DropdownMenuItem key={account.id} className="flex items-center space-x-2 cursor-pointer">
-                      <Avatar className="h-6 w-6">
-                        <AvatarImage src={account.avatar} alt={account.name} />
-                        <AvatarFallback className="text-xs">{account.name.charAt(0)}</AvatarFallback>
-                      </Avatar>
-                      <div className="flex flex-col flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{account.name}</p>
-                        <p className="text-xs text-muted-foreground truncate">{account.email}</p>
-                      </div>
-                      {account.isDefault && (
-                        <Check className="h-4 w-4 text-green-600" />
-                      )}
+                  {emailAccounts.length > 0 ? (
+                    emailAccounts.map((account) => (
+                      <DropdownMenuItem key={account.id} className="flex items-center space-x-2 cursor-pointer">
+                        <Avatar className="h-6 w-6">
+                          <AvatarImage src={account.avatar} alt={account.name} />
+                          <AvatarFallback className="text-xs">{account.name.charAt(0)}</AvatarFallback>
+                        </Avatar>
+                        <div className="flex flex-col flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">{account.name}</p>
+                          <p className="text-xs text-muted-foreground truncate">{account.email}</p>
+                        </div>
+                        {account.isDefault && (
+                          <Check className="h-4 w-4 text-green-600" />
+                        )}
+                      </DropdownMenuItem>
+                    ))
+                  ) : (
+                    <DropdownMenuItem className="text-muted-foreground">
+                      No email accounts connected
                     </DropdownMenuItem>
-                  ))}
+                  )}
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem className="cursor-pointer">
                   <Plus className="h-4 w-4 mr-2" />
                   <span>Add Email Account</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem className="cursor-pointer text-red-600" onClick={handleLogout}>
+                  <LogOut className="h-4 w-4 mr-2" />
+                  <span>Logout</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

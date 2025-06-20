@@ -136,6 +136,8 @@ router.get('/google/callback', async (req, res) => {
         picture: userInfo.picture,
         googleId: userInfo.id,
         gmailTokens: tokens,
+        gmailConnected: true,
+        gmailConnectedAt: new Date(),
         isEmailVerified: true
       });
       await user.save();
@@ -144,6 +146,8 @@ router.get('/google/callback', async (req, res) => {
       logger.info('Updating existing user', { userId: user._id });
       // Update existing user's tokens and info
       user.gmailTokens = tokens;
+      user.gmailConnected = true;
+      user.gmailConnectedAt = new Date();
       user.picture = userInfo.picture;
       user.name = userInfo.name;
       if (!user.firstName) user.firstName = firstName || 'Unknown';
@@ -231,12 +235,23 @@ router.post('/google/callback', async (req, res) => {
     
     if (!user) {
       logger.info('Creating new user', { email: userInfo.email });
+      
+      // Parse name into firstName and lastName
+      const fullName = userInfo.name || '';
+      const nameParts = fullName.trim().split(' ');
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : '';
+      
       user = new User({
         email: userInfo.email,
+        firstName: firstName || 'Unknown',
+        lastName: lastName || 'User',
         name: userInfo.name,
         picture: userInfo.picture,
         googleId: userInfo.id,
         gmailTokens: tokens,
+        gmailConnected: true,
+        gmailConnectedAt: new Date(),
         isEmailVerified: true
       });
       await user.save();
@@ -245,7 +260,10 @@ router.post('/google/callback', async (req, res) => {
       logger.info('Updating existing user', { userId: user._id });
       // Update existing user's tokens
       user.gmailTokens = tokens;
+      user.gmailConnected = true;
+      user.gmailConnectedAt = new Date();
       user.picture = userInfo.picture;
+      user.name = userInfo.name;
       await user.save();
       logger.info('User tokens updated successfully', { userId: user._id });
     }

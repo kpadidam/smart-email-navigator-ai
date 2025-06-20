@@ -1,44 +1,69 @@
+import dotenv from 'dotenv';
+
+// Configure environment variables FIRST before any other imports
+dotenv.config();
+
 import express from 'express';                                                                                                                                                                         
 import cors from 'cors';                                                                                                                                                                               
 import helmet from 'helmet';                                                                                                                                                                           
-import dotenv from 'dotenv';                                                                                                                                                                           
 import mongoose from 'mongoose';                                                                                                                                                                       
 import rateLimit from 'express-rate-limit';                                                                                                                                                            
 import { createServer } from 'http';                                                                                                                                                                   
 import { Server } from 'socket.io';                                                                                                                                                                    
                                                                                                                                                                                                        
 // Import routes                                                                                                                                                                                       
-import authRoutes from './routes/auth.js';                                                                                                                                                             
+import authRoutes from './routes/auth.js';
 import emailRoutes from './routes/emails.js';                                                                                                                                                          
-import dashboardRoutes from './routes/dashboard.js';                                                                                                                                                   
+import dashboardRoutes from './routes/dashboard.js';
+import adminRoutes from './routes/admin.js';                                                                                                                                                   
                                                                                                                                                                                                        
 // Import middleware                                                                                                                                                                                   
 import { errorHandler } from './middleware/errorHandler.js';                                                                                                                                           
 import { logger } from './utils/logger.js';                                                                                                                                                            
 import { authenticateSocket } from './middleware/socketAuth.js';                                                                                                                                       
-import { handleEmailSocket } from './sockets/emailSocket.js';                                                                                                                                          
-                                                                                                                                                                                                       
-dotenv.config();                                                                                                                                                                                       
+import { handleEmailSocket } from './sockets/emailSocket.js';                                                                                                                                                                                       
                                                                                                                                                                                                        
 const app = express();                                                                                                                                                                                 
 const httpServer = createServer(app);                                                                                                                                                                      
                                                                                                                                                                                                        
-// CORS configuration - Updated to include all frontend origins                                                                                                                                       
-const corsOptions = {                                                                                                                                                                                  
-  origin: [                                                                                                                                                                                              
-    'http://localhost:8080',                                                                                                                                                                              
-    'http://localhost:8081',                                                                                                                                                                              
-    'http://localhost:8081',                                                                                                                                                                              
-    'http://10.0.0.131:8080',                                                                                                                                                                              
-    'http://10.0.0.131:8081',                                                                                                                                                                              
-    'http://10.0.0.131:8081',                                                                                                                                                                              
-    process.env.FRONTEND_URL                                                                                                                                                                              
-  ].filter(Boolean),                                                                                                                                                                                      
-  methods: ['GET', 'POST', 'OPTIONS'],                                                                                                                                                                  
-  allowedHeaders: ['Content-Type', 'Authorization'],                                                                                                                                                      
-    credentials: true,                                                                                                                                                                                 
-  preflightContinue: false,                                                                                                                                                                              
-  optionsSuccessStatus: 204                                                                                                                                                                              
+// CORS configuration - Updated to include all frontend origins including Lovable
+const allowedOrigins = [
+  /\.lovable\.app$/,
+  "http://localhost:8080",
+  "http://localhost:8081",
+  "http://localhost:8082",
+  "http://10.0.0.131:8080",
+  "http://10.0.0.131:8081",
+  "http://10.0.0.131:8082",
+  process.env.FRONTEND_URL
+].filter(Boolean);
+
+const corsOptions = {
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    // Check if origin matches any of our allowed origins
+    const isAllowed = allowedOrigins.some(allowedOrigin => {
+      if (typeof allowedOrigin === 'string') {
+        return allowedOrigin === origin;
+      } else if (allowedOrigin instanceof RegExp) {
+        return allowedOrigin.test(origin);
+      }
+      return false;
+    });
+    
+    if (isAllowed) {
+      return callback(null, true);
+    }
+    
+    return callback(new Error("Not allowed by CORS"));
+  },
+  methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+  preflightContinue: false,
+  optionsSuccessStatus: 204
 };                                                                                                                                                                                                     
                                                                                                                                                                                                        
 // Initialize Socket.IO with CORS                                                                                                                                                                        
@@ -58,20 +83,44 @@ io.on('connection', (socket) => {
 // Export io instance for use in other modules                                                                                                                                                         
 export const getIO = () => io;                                                                                                                                                                              
                                                                                                                                                                                                        
-// Request logging middleware                                                                                                                                                                           
-app.use((req, res, next) => {                                                                                                                                                                           
-  logger.info(`${req.method} ${req.url}`, {                                                                                                                                                             
-    method: req.method,                                                                                                                                                                                  
-    url: req.url,                                                                                                                                                                                        
-    query: req.query,                                                                                                                                                                                      
-    body: req.method !== 'GET' ? req.body : undefined,                                                                                                                                                    
-    headers: {                                                                                                                                                                                            
-      origin: req.headers.origin,                                                                                                                                                                            
-      referer: req.headers.referer,                                                                                                                                                                            
-      userAgent: req.headers['user-agent']                                                                                                                                                                            
-    }                                                                                                                                                                                                    
-  });                                                                                                                                                                                                    
-  next();                                                                                                                                                                                                
+// Request logging middleware
+app.use((req, res, next) => {
+  logger.info(`${req.method} ${req.url}`, {
+    method: req.method,
+    url: req.url,
+    query: req.query,
+    body: req.method !== 'GET' ? req.body : undefined,
+    headers: {
+      origin: req.headers.origin,
+      referer: req.headers.referer,
+      userAgent: req.headers['user-agent']
+    }
+  });
+  next();
+});
+
+// URL sanitization middleware - Clean up URLs with trailing newlines/whitespace
+app.use((req, res, next) => {
+  const originalUrl = req.url;
+  
+  // Remove URL-encoded newlines, carriage returns, and whitespace from the end
+  req.url = req.url.replace(/%0A|%0D|%20$/g, '').trim();
+  
+  // Also clean the originalUrl (but not path as it's read-only)
+  if (req.originalUrl) {
+    req.originalUrl = req.originalUrl.replace(/%0A|%0D|%20$/g, '').trim();
+  }
+  
+  // Log URL sanitization if changes were made
+  if (originalUrl !== req.url) {
+    logger.info('URL sanitized', { 
+      original: originalUrl, 
+      sanitized: req.url,
+      method: req.method 
+    });
+  }
+  
+  next();
 });                                                                                                                                                                                                    
                                                                                                                                                                                                        
 // Apply CORS before other middleware                                                                                                                                                                    
@@ -101,17 +150,29 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/email-man
   .catch(err => logger.error('MongoDB connection error:', err));                                                                                                                                       
                                                                                                                                                                                                        
 // Routes                                                                                                                                                                                              
-app.use('/api/auth', authRoutes);                                                                                                                                                                      
-app.use('/api/emails', emailRoutes);                                                                                                                                                                   
-app.use('/api/dashboard', dashboardRoutes);                                                                                                                                                            
+app.use('/api/auth', authRoutes);
+app.use('/api/emails', emailRoutes);
+app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/admin', adminRoutes);                                                                                                                                                            
                                                                                                                                                                                                        
-// Health check endpoint                                                                                                                                                                               
-app.get('/health', (req, res) => {                                                                                                                                                                     
-  res.status(200).json({                                                                                                                                                                               
-    status: 'OK',                                                                                                                                                                                      
-    timestamp: new Date().toISOString(),                                                                                                                                                               
-    socketConnections: io.engine.clientsCount                                                                                                                                                          
-  });                                                                                                                                                                                                  
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.status(200).json({
+    status: 'OK',
+    timestamp: new Date().toISOString(),
+    socketConnections: io.engine.clientsCount
+  });
+});
+
+// API Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.status(200).json({
+    status: 'OK',
+    message: 'Email Navigator API is running',
+    timestamp: new Date().toISOString(),
+    cors: 'enabled',
+    socketConnections: io.engine.clientsCount
+  });
 });                                                                                                                                                                                                    
                                                                                                                                                                                                        
 // Error handling middleware                                                                                                                                                                           

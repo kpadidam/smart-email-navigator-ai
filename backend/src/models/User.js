@@ -70,18 +70,13 @@ const userSchema = new mongoose.Schema({
     select: false
   },
   gmailTokens: {
-    access_token: {
-      type: String,
-      select: false
+    type: {
+      access_token: String,
+      refresh_token: String,
+      expiry_date: Date
     },
-    refresh_token: {
-      type: String,
-      select: false
-    },
-    expiry_date: {
-      type: Date,
-      select: false
-    }
+    select: false,
+    default: {}
   },
   gmailConnected: {
     type: Boolean,
@@ -131,7 +126,7 @@ userSchema.methods.toJSON = function() {
 };
 
 // Indexes for performance
-userSchema.index({ email: 1 });
+// Note: email index is already created by unique: true
 userSchema.index({ isActive: 1 });
 
 export default mongoose.model('User', userSchema);

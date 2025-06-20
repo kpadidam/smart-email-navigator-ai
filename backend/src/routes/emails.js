@@ -1,18 +1,42 @@
 import express from 'express';
-import { authenticate } from '../middleware/auth.js';
+import { authMiddleware } from '../middleware/authMiddleware.js';
 import Email from '../models/Email.js';
-import gmailService from '../services/gmailService.js';
+import { gmailService } from '../services/gmailService.js';
 import emailProcessingService from '../services/emailProcessingService.js';
 import { logger } from '../utils/logger.js';
-import { getIO } from '../app.js';
+import { getIO } from '../sockets/socketManager.js';
 
 const router = express.Router();
 
 // Apply authentication middleware to all routes
-router.use(authenticate);
+router.use(authMiddleware);
 
-// Sync emails from Gmail
-router.post('/sync', async (req, res) => {
+// Helper function to transform email document to frontend format
+const transformEmailForFrontend = (email) => {
+  const emailObj = email.toObject ? email.toObject() : email;
+  
+  return {
+    id: emailObj._id.toString(), // Convert ObjectId to string for frontend
+    sender: emailObj.from?.name || emailObj.from?.email || 'Unknown Sender',
+    senderEmail: emailObj.from?.email || '',
+    subject: emailObj.subject || '(No Subject)',
+    summary: emailObj.aiAnalysis?.summary || emailObj.snippet || 'No summary available',
+    fullContent: emailObj.body?.html || emailObj.body?.text || '',
+    category: emailObj.aiAnalysis?.category || 'other',
+    datetime: emailObj.receivedAt ? emailObj.receivedAt.toISOString() : null,
+    timestamp: emailObj.receivedAt ? new Date(emailObj.receivedAt).toLocaleDateString() : '',
+    priority: emailObj.aiAnalysis?.priority || 'medium',
+    attachments: emailObj.attachments?.map(att => ({
+      name: att.filename || 'Unknown',
+      size: att.size ? `${Math.round(att.size / 1024)}KB` : 'Unknown'
+    })) || [],
+    tags: emailObj.labelIds || [],
+    status: emailObj.isRead ? 'read' : 'unread'
+  };
+};
+
+// Sync emails from Gmail (GET route to check sync status)
+router.get('/sync', async (req, res) => {
   try {
     const user = req.user;
     
@@ -20,7 +44,33 @@ router.post('/sync', async (req, res) => {
       return res.status(400).json({ error: 'Gmail not connected. Please connect your Gmail account first.' });
     }
 
-    // Fetch emails from Gmail
+    // Return sync status/info instead of performing sync
+    res.json({ 
+      message: 'Use POST method to sync emails',
+      method: 'POST',
+      connected: user.gmailConnected,
+      hasTokens: !!(user.gmailTokens && user.gmailTokens.access_token)
+    });
+  } catch (error) {
+    logger.error('Sync status check error:', error);
+    res.status(500).json({ error: 'Failed to check sync status' });
+  }
+});
+
+// Sync emails from Gmail (POST route to perform sync)
+router.post('/sync', async (req, res) => {
+  try {
+    const user = req.user;
+    
+    // Check Gmail connection
+    if (!user.gmailConnected || !user.gmailTokens) {
+      return res.status(400).json({ 
+        error: 'Gmail not connected. Please connect your Gmail account first.',
+        action: 'reconnect'
+      });
+    }
+
+    // Attempt to sync emails
     const { emails, nextPageToken } = await gmailService.listEmails(user, {
       maxResults: 50,
       q: 'in:inbox'
@@ -37,6 +87,21 @@ router.post('/sync', async (req, res) => {
         });
 
         if (!existingEmail) {
+          // Helper function to parse email addresses
+          const parseEmailAddresses = (addressString) => {
+            if (!addressString) return [];
+            
+            // Split by comma and parse each address
+            return addressString.split(',').map(addr => {
+              const trimmed = addr.trim();
+              const match = trimmed.match(/^(.+?)\s*<(.+?)>$/) || [null, '', trimmed];
+              return {
+                name: match[1]?.trim().replace(/"/g, '') || '',
+                email: (match[2] || trimmed).trim()
+              };
+            }).filter(addr => addr.email); // Only include entries with valid emails
+          };
+
           const email = new Email({
             userId: user._id,
             gmailId: emailData.id,
@@ -46,9 +111,9 @@ router.post('/sync', async (req, res) => {
               name: emailData.from?.split('<')[0]?.trim() || '',
               email: emailData.from?.match(/<(.+)>/)?.[1] || emailData.from || ''
             },
-            to: emailData.to,
-            cc: emailData.cc,
-            bcc: emailData.bcc,
+            to: parseEmailAddresses(emailData.to),
+            cc: parseEmailAddresses(emailData.cc),
+            bcc: parseEmailAddresses(emailData.bcc),
             body: {
               text: emailData.textBody || '',
               html: emailData.htmlBody || ''
@@ -92,53 +157,36 @@ router.post('/sync', async (req, res) => {
       totalFetched: emails.length 
     });
 
+    // Provide more informative message based on sync results
+    let message = 'Gmail sync completed';
+    if (savedEmails.length === 0 && emails.length > 0) {
+      message = 'Gmail sync completed - all emails are already up to date';
+    } else if (savedEmails.length > 0) {
+      message = `Gmail sync completed - ${savedEmails.length} new emails added`;
+    }
+
     res.json({ 
-      message: 'Gmail sync completed',
+      message,
       emailsSynced: savedEmails.length,
       totalFetched: emails.length,
-      nextPageToken
+      nextPageToken,
+      status: savedEmails.length === 0 && emails.length > 0 ? 'up_to_date' : 'synced'
     });
 
   } catch (error) {
-    logger.error('Gmail sync error:', { userId: req.user._id, error: error.message });
-    res.status(500).json({ error: 'Failed to sync emails from Gmail' });
-  }
-});
+    logger.error('Email sync failed:', { 
+      userId: req.user._id, 
+      error: error.message 
+    });
 
-// Get emails with filtering and pagination
-router.get('/', async (req, res) => {
-  try {
-    const { category, search, limit = 20, offset = 0 } = req.query;
-    const userId = req.user._id;
-
-    // Build query
-    const query = { userId };
-    
-    if (category && category !== 'all') {
-      query['aiAnalysis.category'] = category;
+    // Handle specific token refresh errors
+    if (error.message.includes('refresh token') || error.message.includes('invalid_grant')) {
+      return res.status(401).json({
+        error: 'Gmail authentication expired. Please reconnect your Gmail account.',
+        action: 'reconnect'
+      });
     }
-    
-    if (search) {
-      query.$or = [
-        { subject: { $regex: search, $options: 'i' } },
-        { 'from.name': { $regex: search, $options: 'i' } },
-        { 'from.email': { $regex: search, $options: 'i' } },
-        { 'body.text': { $regex: search, $options: 'i' } }
-      ];
-    }
-
-    // Get emails with pagination
-    const emails = await Email.find(query)
-      .sort({ receivedAt: -1 })
-      .limit(parseInt(limit))
-      .skip(parseInt(offset));
-
-    const total = await Email.countDocuments(query);
-
-    res.json({ emails, total });
-  } catch (error) {
-    logger.error('Error fetching emails:', error);
-    res.status(500).json({ error: 'Failed to fetch emails' });
+    res.status(500).json({ error: 'Failed to sync emails from Gmail', details: error.message });
   }
 });
 
@@ -203,13 +251,60 @@ router.get('/gmail/status', async (req, res) => {
   }
 });
 
-// Get single email by ID (must be after specific routes)
+// Get emails with filtering and pagination
+router.get('/', async (req, res) => {
+  try {
+    const { category, search, limit = 20, offset = 0 } = req.query;
+    const userId = req.user._id;
+
+    // Build query
+    const query = { userId };
+    
+    if (category && category !== 'all') {
+      query['aiAnalysis.category'] = category;
+    }
+    
+    if (search) {
+      query.$or = [
+        { subject: { $regex: search, $options: 'i' } },
+        { 'from.name': { $regex: search, $options: 'i' } },
+        { 'from.email': { $regex: search, $options: 'i' } },
+        { 'body.text': { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    // Get emails with pagination
+    const emails = await Email.find(query)
+      .sort({ receivedAt: -1 })
+      .limit(parseInt(limit))
+      .skip(parseInt(offset));
+
+    const total = await Email.countDocuments(query);
+
+    // Transform emails for frontend
+    const transformedEmails = emails.map(transformEmailForFrontend);
+
+    res.json({ emails: transformedEmails, total });
+  } catch (error) {
+    logger.error('Error fetching emails:', error);
+    res.status(500).json({ error: 'Failed to fetch emails' });
+  }
+});
+
+// Get single email by ID (MUST BE LAST - after all specific routes)
 router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const userId = req.user._id;
 
-    const email = await Email.findOne({ _id: id, userId });
+    // Validate ObjectId format
+    const cleanId = id.trim(); // Remove any whitespace/newlines
+    if (!cleanId || !cleanId.match(/^[0-9a-fA-F]{24}$/)) {
+      logger.warn('Invalid email ID format', { id: id, cleanId: cleanId, userId: userId });
+      return res.status(400).json({ error: 'Invalid email ID format' });
+    }
+
+    const email = await Email.findOne({ _id: cleanId, userId });
     
     if (!email) {
       return res.status(404).json({ error: 'Email not found' });
@@ -234,7 +329,9 @@ router.get('/:id', async (req, res) => {
       io.to(userId.toString()).emit('email:read', { emailId: email._id });
     }
 
-    res.json(email);
+    // Transform email for frontend
+    const transformedEmail = transformEmailForFrontend(email);
+    res.json(transformedEmail);
   } catch (error) {
     logger.error('Error fetching email:', error);
     res.status(500).json({ error: 'Failed to fetch email' });
@@ -248,8 +345,15 @@ router.patch('/:id', async (req, res) => {
     const userId = req.user._id;
     const updates = req.body;
 
+    // Validate ObjectId format
+    const cleanId = id.trim(); // Remove any whitespace/newlines
+    if (!cleanId || !cleanId.match(/^[0-9a-fA-F]{24}$/)) {
+      logger.warn('Invalid email ID format for update', { id: id, cleanId: cleanId, userId: userId });
+      return res.status(400).json({ error: 'Invalid email ID format' });
+    }
+
     const email = await Email.findOneAndUpdate(
-      { _id: id, userId },
+      { _id: cleanId, userId },
       updates,
       { new: true }
     );

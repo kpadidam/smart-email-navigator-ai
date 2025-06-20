@@ -1,5 +1,6 @@
 import { logger } from '../utils/logger.js';
 import Email from '../models/Email.js';
+import { openaiService } from './openaiService.js';
 
 /**
  * Email Processing Service for AI categorization and analysis
@@ -7,35 +8,67 @@ import Email from '../models/Email.js';
 class EmailProcessingService {
   
   /**
-   * Categorize email based on content analysis
+   * Categorize email using OpenAI (with fallback to rule-based)
    * @param {Object} emailData - Email data to analyze
    * @returns {Object} AI analysis results
    */
   async categorizeEmail(emailData) {
     try {
+      // Try OpenAI classification first
+      const openaiResult = await openaiService.classifyAndSummarize(emailData);
+      
+      // Enhance with additional analysis
       const { subject, from, body } = emailData;
       const content = `${subject} ${body.text || body.html || ''}`.toLowerCase();
       
-      // Simple rule-based categorization (can be enhanced with actual AI/ML)
+      // Add sentiment analysis
+      const sentiment = this.analyzeSentiment(content);
+      
+      // Extract action items
+      const actionItems = this.extractActionItems(content);
+      
+      return {
+        category: openaiResult.category,
+        priority: openaiResult.priority,
+        sentiment,
+        summary: openaiResult.summary,
+        datetime: openaiResult.datetime,
+        actionItems,
+        confidence: openaiResult.confidence,
+        processedAt: openaiResult.processedAt,
+        processingTime: openaiResult.processingTime,
+        source: 'openai'
+      };
+      
+    } catch (error) {
+      logger.error('OpenAI categorization failed, using fallback:', error);
+      
+      // Fallback to rule-based categorization
+      return this.getFallbackCategorization(emailData);
+    }
+  }
+
+  /**
+   * Fallback rule-based categorization
+   */
+  getFallbackCategorization(emailData) {
+    try {
+      const { subject, from, body } = emailData;
+      const content = `${subject} ${body.text || body.html || ''}`.toLowerCase();
+      
+      // Map old categories to new PRD categories
       let category = 'other';
       let priority = 'medium';
-      let sentiment = 'neutral';
       
-      // Category detection
-      if (this.isWorkEmail(content, from)) {
-        category = 'work';
+      // Category detection with PRD categories
+      if (subject.includes('meeting') || content.includes('meeting') || content.includes('calendar')) {
+        category = 'meetings';
         priority = 'high';
-      } else if (this.isPromotionalEmail(content, from)) {
-        category = 'promotional';
-        priority = 'low';
-      } else if (this.isSocialEmail(content, from)) {
-        category = 'social';
-        priority = 'low';
-      } else if (this.isUpdateEmail(content, from)) {
-        category = 'updates';
+      } else if (subject.includes('delivery') || content.includes('shipped') || content.includes('tracking')) {
+        category = 'delivery';
         priority = 'medium';
-      } else if (this.isPersonalEmail(content, from)) {
-        category = 'personal';
+      } else if (subject.includes('interview') || content.includes('interview')) {
+        category = 'interviews';
         priority = 'high';
       }
       
@@ -44,8 +77,8 @@ class EmailProcessingService {
         priority = 'high';
       }
       
-      // Sentiment analysis (basic)
-      sentiment = this.analyzeSentiment(content);
+      // Sentiment analysis
+      const sentiment = this.analyzeSentiment(content);
       
       // Generate summary
       const summary = this.generateSummary(subject, body.text || body.html || '');
@@ -58,21 +91,27 @@ class EmailProcessingService {
         priority,
         sentiment,
         summary,
+        datetime: null,
         actionItems,
-        confidence: 0.8, // Static confidence for now
-        processedAt: new Date()
+        confidence: 0.3, // Lower confidence for fallback
+        processedAt: new Date(),
+        processingTime: 0,
+        source: 'fallback'
       };
       
     } catch (error) {
-      logger.error('Error categorizing email:', error);
+      logger.error('Error in fallback categorization:', error);
       return {
         category: 'other',
         priority: 'medium',
         sentiment: 'neutral',
         summary: emailData.subject || 'No subject',
+        datetime: null,
         actionItems: [],
         confidence: 0.1,
-        processedAt: new Date()
+        processedAt: new Date(),
+        processingTime: 0,
+        source: 'error'
       };
     }
   }

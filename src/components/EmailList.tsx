@@ -1,19 +1,23 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Calendar, Package, Briefcase, Mail, AlertCircle } from "lucide-react";
+import { Calendar, Package, Briefcase, Mail, AlertCircle, Loader2, Inbox } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useNavigate } from "react-router-dom";
 import { emailService, Email } from "@/services/emailService";
 import { authService } from "@/services/authService";
+import { logger } from "@/utils/logger";
 
 interface EmailListProps {
   selectedCategory: string;
   searchTerm: string;
   refreshTrigger?: number;
+  selectedEmailId?: string | null;
+  onSelectEmail?: (emailId: string) => void;
 }
 
-const EmailList = ({ selectedCategory, searchTerm, refreshTrigger }: EmailListProps) => {
+const EmailList = ({ selectedCategory, searchTerm, refreshTrigger, selectedEmailId, onSelectEmail }: EmailListProps) => {
   const navigate = useNavigate();
   const [emails, setEmails] = useState<Email[]>([]);
   const [loading, setLoading] = useState(true);
@@ -21,23 +25,25 @@ const EmailList = ({ selectedCategory, searchTerm, refreshTrigger }: EmailListPr
 
   useEffect(() => {
     const loadEmails = async () => {
-      console.log('Loading emails...');
-      console.log('Auth status:', authService.isAuthenticated());
-      console.log('Auth token:', !!authService.getToken());
+      logger.email('Loading emails', { 
+        isAuthenticated: authService.isAuthenticated(),
+        hasToken: !!authService.getToken()
+      });
       
       setLoading(true);
       setError(null);
       
       try {
         if (!authService.isAuthenticated()) {
+          logger.error('Email fetch failed: Not authenticated');
           throw new Error('Not authenticated');
         }
 
         const data = await emailService.fetchEmails();
-        console.log('Emails loaded:', data);
-        setEmails(data);
+        logger.email('Emails loaded successfully', { emailCount: data.length });
+        setEmails(Array.isArray(data) ? data : []);
       } catch (err) {
-        console.error('Error loading emails:', err);
+        logger.error('Error loading emails', { error: err });
         
         if (err instanceof Error && err.message.includes('Failed to fetch')) {
           setError('Cannot connect to server. Please ensure the backend is running on port 5001.');
@@ -94,27 +100,43 @@ const EmailList = ({ selectedCategory, searchTerm, refreshTrigger }: EmailListPr
     return matchesCategory && matchesSearch;
   });
 
+  // Loading state
   if (loading) {
     return (
       <Card>
         <CardContent className="p-8 text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 mx-auto mb-4"></div>
-          <p>Loading emails...</p>
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-blue-600" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Loading emails...</h3>
+          <p className="text-gray-600">Please wait while we fetch your emails</p>
         </CardContent>
       </Card>
     );
   }
 
+  // Error state
   if (error) {
     return (
       <Card>
-        <CardContent className="p-8 text-center">
-          <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Error Loading Emails</h3>
-          <p className="text-red-600 mb-4">{error}</p>
-          <Button onClick={() => window.location.reload()}>
-            Try Again
-          </Button>
+        <CardContent className="p-8">
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription className="font-medium">
+              Failed to load emails
+            </AlertDescription>
+          </Alert>
+          <div className="text-center mt-6">
+            <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">Error Loading Emails</h3>
+            <p className="text-red-600 mb-4">{error}</p>
+            <div className="flex gap-2 justify-center">
+              <Button onClick={() => window.location.reload()}>
+                Try Again
+              </Button>
+              <Button variant="outline" onClick={() => navigate('/login')}>
+                Go to Login
+              </Button>
+            </div>
+          </div>
         </CardContent>
       </Card>
     );
@@ -129,8 +151,10 @@ const EmailList = ({ selectedCategory, searchTerm, refreshTrigger }: EmailListPr
         return (
           <Card 
             key={email.id} 
-            className="hover:shadow-md transition-shadow cursor-pointer"
-            onClick={() => navigate(`/email/${email.id}`)}
+            className={`hover:shadow-md transition-shadow cursor-pointer ${
+              selectedEmailId === email.id ? 'ring-2 ring-blue-500 bg-blue-50' : ''
+            }`}
+            onClick={() => onSelectEmail ? onSelectEmail(email.id) : navigate(`/email/${email.id}`)}
           >
             <CardContent className="p-6">
               <div className="flex items-start justify-between">
@@ -203,14 +227,41 @@ const EmailList = ({ selectedCategory, searchTerm, refreshTrigger }: EmailListPr
       {filteredEmails.length === 0 && !loading && !error && (
         <Card>
           <CardContent className="p-8 text-center">
-            <Mail className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No emails found</h3>
-            <p className="text-gray-500 mb-4">
-              {emails.length === 0 
-                ? "Try syncing your emails first to see them here." 
-                : "Try adjusting your search terms or selected category."
-              }
-            </p>
+            <div className="max-w-md mx-auto">
+              {emails.length === 0 ? (
+                <>
+                  <Inbox className="h-16 w-16 text-gray-300 mx-auto mb-6" />
+                  <h3 className="text-xl font-semibold text-gray-900 mb-3">No emails yet</h3>
+                  <p className="text-gray-500 mb-6">
+                    Your inbox is empty. Try syncing your Gmail account to import your emails, 
+                    or check back later for new messages.
+                  </p>
+                  <div className="bg-blue-50 p-4 rounded-lg">
+                    <p className="text-sm text-blue-800">
+                      💡 Tip: Click the "Refresh Emails" button above to sync your latest emails from Gmail.
+                    </p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <Mail className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No matching emails</h3>
+                  <p className="text-gray-500 mb-4">
+                    No emails match your current search or category filter. 
+                    Try adjusting your search terms or selecting a different category.
+                  </p>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => {
+                      // Reset filters - this would need to be passed as props
+                      window.location.reload();
+                    }}
+                  >
+                    Clear Filters
+                  </Button>
+                </>
+              )}
+            </div>
           </CardContent>
         </Card>
       )}
