@@ -1,7 +1,13 @@
 import dotenv from 'dotenv';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 
-// Configure environment variables FIRST before any other imports
-dotenv.config();
+// Get the directory path
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Configure environment variables from root directory
+dotenv.config({ path: join(__dirname, '../../.env') });
 
 import express from 'express';                                                                                                                                                                         
 import cors from 'cors';                                                                                                                                                                               
@@ -38,6 +44,9 @@ const allowedOrigins = [
   "http://192.168.110.188:8080",
   "http://192.168.110.188:8081",
   "http://192.168.110.188:8082",
+  "http://192.168.110.14:8080",
+  "http://192.168.110.14:8081",
+  "http://192.168.110.14:8082",
   process.env.FRONTEND_URL
 ].filter(Boolean);
 

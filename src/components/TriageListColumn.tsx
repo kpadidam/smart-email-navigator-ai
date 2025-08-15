@@ -19,9 +19,9 @@ const TriageListColumn = ({
   onSelectEmail
 }: TriageListColumnProps) => {
   return (
-    <div className="column-list flex-1 min-w-0 bg-white border-r border-gray-200 flex flex-col overflow-hidden">
+    <div className="column-list flex-1 min-w-0 bg-white lg:border-r border-gray-200 flex flex-col overflow-hidden h-full">
       {/* Header with Search */}
-      <div className="p-4 border-b border-gray-100">
+      <div className="p-3 lg:p-4 border-b border-gray-100">
         <SearchBar 
           searchTerm={searchTerm}
           onSearchChange={onSearchChange}

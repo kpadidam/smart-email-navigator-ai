@@ -22,9 +22,9 @@ const NavigationColumn = ({
   onSyncComplete
 }: NavigationColumnProps) => {
   return (
-    <div className="column-nav flex-shrink-0 w-80 bg-white border-r border-gray-200 flex flex-col overflow-hidden">
+    <div className="column-nav flex-shrink-0 w-full lg:w-80 bg-white lg:border-r border-gray-200 flex flex-col overflow-hidden h-full">
       {/* Top Section: Logo and Stats */}
-      <div className="p-6 border-b border-gray-100">
+      <div className="p-4 lg:p-6 border-b border-gray-100">
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-900 mb-1">Smart Email Tracker</h1>
           <p className="text-sm text-gray-600">AI-powered email management</p>

@@ -1,5 +1,5 @@
 import { logger } from '../utils/logger.js';
-import Email from '../models/Email.js';
+import { emailDbService } from './emailDbService.js';
 import { openaiService } from './openaiService.js';
 
 /**
@@ -18,8 +18,9 @@ class EmailProcessingService {
       const openaiResult = await openaiService.classifyAndSummarize(emailData);
       
       // Enhance with additional analysis
-      const { subject, from, body } = emailData;
-      const content = `${subject} ${body.text || body.html || ''}`.toLowerCase();
+      const { subject, from, body, content: emailContent } = emailData;
+      const bodyText = body?.text || body?.html || emailContent || '';
+      const content = `${subject || ''} ${bodyText}`.toLowerCase();
       
       // Add sentiment analysis
       const sentiment = this.analyzeSentiment(content);
@@ -53,8 +54,9 @@ class EmailProcessingService {
    */
   getFallbackCategorization(emailData) {
     try {
-      const { subject, from, body } = emailData;
-      const content = `${subject} ${body.text || body.html || ''}`.toLowerCase();
+      const { subject, from, body, content: emailContent } = emailData;
+      const bodyText = body?.text || body?.html || emailContent || '';
+      const content = `${subject || ''} ${bodyText}`.toLowerCase();
       
       // Map old categories to new PRD categories
       let category = 'other';
@@ -128,17 +130,21 @@ class EmailProcessingService {
       try {
         const aiAnalysis = await this.categorizeEmail(email);
         
-        // Update email in database
-        await Email.findByIdAndUpdate(email._id, { aiAnalysis });
+        // Update email in database using Prisma
+        if (email.id) {
+          await emailDbService.updateEmail(email.id, { 
+            aiAnalysis: JSON.stringify(aiAnalysis) 
+          });
+        }
         
         processedEmails.push({
-          ...email.toObject(),
+          ...email,
           aiAnalysis
         });
         
-        logger.info('Email processed', { emailId: email._id, category: aiAnalysis.category });
+        logger.info('Email processed', { emailId: email.id, category: aiAnalysis.category });
       } catch (error) {
-        logger.error('Error processing email:', { emailId: email._id, error: error.message });
+        logger.error('Error processing email:', { emailId: email.id, error: error.message });
         processedEmails.push(email);
       }
     }

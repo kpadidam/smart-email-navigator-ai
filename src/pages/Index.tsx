@@ -1,4 +1,3 @@
-
 import Header from "../components/Header";
 import NavigationColumn from "../components/NavigationColumn";
 import TriageListColumn from "../components/TriageListColumn";
@@ -9,6 +8,10 @@ import { emailService } from "../services/emailService";
 import { authService } from "../services/authService";
 import { useToast } from "../hooks/use-toast";
 import { useGlobalLoading } from "../hooks/useGlobalLoading";
+import { Menu, X, Mail, Filter } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { cn } from "@/lib/utils";
 
 const Index = () => {
   const [selectedCategory, setSelectedCategory] = useState("all");
@@ -18,6 +21,8 @@ const Index = () => {
   const [isInitialSyncDone, setIsInitialSyncDone] = useState(false);
   const [emailStats, setEmailStats] = useState(null);
   const [statsLoading, setStatsLoading] = useState(true);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
   const { toast } = useToast();
   const { setLoading, setLoadingMessage } = useGlobalLoading();
 
@@ -79,7 +84,6 @@ const Index = () => {
   }, [refreshTrigger]);
 
   const handleSyncComplete = () => {
-    // Trigger a refresh of the email list and stats
     setRefreshTrigger(prev => prev + 1);
   };
 
@@ -113,53 +117,109 @@ const Index = () => {
     }
   };
 
-  // Handler functions for the new 3-column layout
   const handleSelectCategory = (categoryName: string) => {
     setSelectedCategory(categoryName);
-    setSelectedEmailId(null); // Clear selected email when changing category
+    setSelectedEmailId(null);
+    setMobileNavOpen(false); // Close nav on mobile after selection
   };
 
   const handleSelectEmail = (emailId: string) => {
     setSelectedEmailId(emailId);
+    setMobileDetailOpen(true); // Open detail view on mobile
   };
 
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
       
-      {/* Main Dashboard Container with 3-Column Layout */}
-      <div className="flex h-[calc(100vh-64px)] overflow-hidden">
+      {/* Mobile Header Bar */}
+      <div className="lg:hidden sticky top-16 z-20 bg-white border-b border-gray-200 px-4 py-2 flex items-center justify-between">
+        <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
+          <SheetTrigger asChild>
+            <Button variant="ghost" size="icon">
+              <Menu className="h-5 w-5" />
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="left" className="p-0 w-80">
+            <NavigationColumn
+              emailStats={emailStats}
+              statsLoading={statsLoading}
+              selectedCategory={selectedCategory}
+              onCategoryChange={handleSelectCategory}
+              refreshTrigger={refreshTrigger}
+              onManualRefresh={handleManualRefresh}
+              onSyncComplete={handleSyncComplete}
+            />
+          </SheetContent>
+        </Sheet>
         
-        {/* Column 1: Navigation & Categories */}
-        <NavigationColumn
-          emailStats={emailStats}
-          statsLoading={statsLoading}
-          selectedCategory={selectedCategory}
-          onCategoryChange={handleSelectCategory}
-          refreshTrigger={refreshTrigger}
-          onManualRefresh={handleManualRefresh}
-          onSyncComplete={handleSyncComplete}
-        />
+        <div className="flex items-center space-x-2">
+          <Mail className="h-5 w-5 text-gray-600" />
+          <span className="font-medium text-gray-900">
+            {selectedCategory === "all" ? "All Emails" : selectedCategory}
+          </span>
+        </div>
+        
+        <Button variant="ghost" size="icon">
+          <Filter className="h-5 w-5" />
+        </Button>
+      </div>
+      
+      {/* Main Dashboard Container */}
+      <div className="flex h-[calc(100vh-64px)] lg:h-[calc(100vh-64px)] overflow-hidden">
+        
+        {/* Desktop Navigation - Hidden on Mobile */}
+        <div className="hidden lg:block">
+          <NavigationColumn
+            emailStats={emailStats}
+            statsLoading={statsLoading}
+            selectedCategory={selectedCategory}
+            onCategoryChange={handleSelectCategory}
+            refreshTrigger={refreshTrigger}
+            onManualRefresh={handleManualRefresh}
+            onSyncComplete={handleSyncComplete}
+          />
+        </div>
 
-        {/* Column 2: Email Triage List */}
-        <TriageListColumn
-          searchTerm={searchTerm}
-          onSearchChange={setSearchTerm}
-          selectedCategory={selectedCategory}
-          refreshTrigger={refreshTrigger}
-          selectedEmailId={selectedEmailId}
-          onSelectEmail={handleSelectEmail}
-        />
+        {/* Email List - Full Width on Mobile, Normal on Desktop */}
+        <div className={cn(
+          "flex-1 lg:flex-initial lg:min-w-0",
+          "w-full lg:w-auto"
+        )}>
+          <TriageListColumn
+            searchTerm={searchTerm}
+            onSearchChange={setSearchTerm}
+            selectedCategory={selectedCategory}
+            refreshTrigger={refreshTrigger}
+            selectedEmailId={selectedEmailId}
+            onSelectEmail={handleSelectEmail}
+          />
+        </div>
 
-        {/* Column 3: Email Detail Pane */}
-        <DetailPaneColumn selectedEmailId={selectedEmailId} />
+        {/* Desktop Detail Pane - Hidden on Mobile */}
+        <div className="hidden lg:block flex-1">
+          <DetailPaneColumn selectedEmailId={selectedEmailId} />
+        </div>
       </div>
 
-      {/* Mobile Responsive: Show detail pane as overlay on smaller screens */}
-      <MobileEmailDetail 
-        selectedEmailId={selectedEmailId}
-        onClose={() => setSelectedEmailId(null)}
-      />
+      {/* Mobile Detail Sheet */}
+      <Sheet open={mobileDetailOpen && !!selectedEmailId} onOpenChange={setMobileDetailOpen}>
+        <SheetContent side="right" className="p-0 w-full sm:max-w-lg">
+          <div className="h-full overflow-y-auto">
+            <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
+              <h2 className="font-semibold text-gray-900">Email Details</h2>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setMobileDetailOpen(false)}
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+            <DetailPaneColumn selectedEmailId={selectedEmailId} />
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 };

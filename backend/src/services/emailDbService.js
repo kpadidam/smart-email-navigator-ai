@@ -89,6 +89,41 @@ class EmailDbService {
   }
 
   /**
+   * Update email (simple version without userId check)
+   */
+  async updateEmail(id, updateData) {
+    // Parse AI analysis if it's a string
+    if (typeof updateData.aiAnalysis === 'string') {
+      try {
+        updateData.aiAnalysis = JSON.parse(updateData.aiAnalysis);
+      } catch (e) {
+        // If parsing fails, leave as is
+      }
+    }
+    
+    // Transform the AI analysis data
+    if (updateData.aiAnalysis) {
+      const analysis = updateData.aiAnalysis;
+      updateData = {
+        ...updateData,
+        aiCategory: analysis.category?.toUpperCase() || null,
+        aiPriority: analysis.priority?.toUpperCase() || null,
+        aiSentiment: analysis.sentiment?.toUpperCase() || null,
+        aiSummary: analysis.summary || null,
+        aiActionItems: analysis.actionItems || [],
+        aiConfidence: analysis.confidence || null,
+        aiProcessedAt: analysis.processedAt || new Date()
+      };
+      delete updateData.aiAnalysis;
+    }
+    
+    return await prisma.email.update({
+      where: { id },
+      data: updateData
+    });
+  }
+
+  /**
    * Update email
    */
   async update(id, userId, updateData) {
