@@ -1,0 +1,144 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                     String         @id @default(uuid())
+  firstName              String         @db.VarChar(50)
+  lastName               String         @db.VarChar(50)
+  email                  String         @unique @db.VarChar(255)
+  name                   String?        @db.VarChar(100)
+  picture                String?        @db.Text
+  googleId               String?        @unique
+  password               String?
+  role                   Role           @default(USER)
+  isEmailVerified        Boolean        @default(false)
+  emailVerificationToken String?
+  passwordResetToken     String?
+  passwordResetExpires   DateTime?
+  gmailTokens            Json?          // Stores OAuth tokens as JSON
+  gmailConnected         Boolean        @default(false)
+  gmailConnectedAt       DateTime?
+  lastLogin              DateTime?
+  isActive               Boolean        @default(true)
+  createdAt              DateTime       @default(now())
+  updatedAt              DateTime       @updatedAt
+
+  // Relations
+  emails                 Email[]
+  emailAccounts          EmailAccount[]
+
+  @@index([email])
+  @@index([isActive])
+}
+
+model EmailAccount {
+  id            String    @id @default(uuid())
+  userId        String
+  email         String    @db.VarChar(255)
+  provider      Provider  @default(GMAIL)
+  accessToken   String    @db.Text
+  refreshToken  String    @db.Text
+  tokenExpiry   DateTime?
+  isActive      Boolean   @default(true)
+  lastSyncAt    DateTime?
+  syncSettings  Json?     // Stores sync settings as JSON
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emails        Email[]
+
+  @@unique([userId, email])
+  @@index([userId, isActive])
+}
+
+model Email {
+  id              String    @id @default(uuid())
+  userId          String
+  accountId       String    // Can be 'primary' or EmailAccount.id
+  emailAccountId  String?
+  gmailId         String    @unique
+  messageId       String?   @unique
+  threadId        String?
+  subject         String
+  fromName        String?
+  fromEmail       String
+  to              Json      // Array of {name, email} objects
+  cc              Json?     // Array of {name, email} objects
+  bcc             Json?     // Array of {name, email} objects
+  bodyText        String?   @db.Text
+  bodyHtml        String?   @db.Text
+  attachments     Json?     // Array of attachment objects
+  labels          String[]
+  labelIds        String[]
+  snippet         String?   @db.Text
+  isRead          Boolean   @default(false)
+  isStarred       Boolean   @default(false)
+  isImportant     Boolean   @default(false)
+  receivedAt      DateTime
+  
+  // AI Analysis fields
+  aiCategory      Category?
+  aiPriority      Priority?
+  aiSentiment     Sentiment?
+  aiSummary       String?   @db.Text
+  aiActionItems   String[]
+  aiConfidence    Float?
+  aiProcessedAt   DateTime?
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emailAccount    EmailAccount? @relation(fields: [emailAccountId], references: [id], onDelete: SetNull)
+
+  @@index([userId, receivedAt(sort: Desc)])
+  @@index([emailAccountId, receivedAt(sort: Desc)])
+  @@index([userId, accountId, receivedAt(sort: Desc)])
+  @@index([userId, gmailId])
+  @@index([fromEmail])
+  @@index([aiCategory])
+  @@index([aiPriority])
+}
+
+// Enums
+enum Role {
+  USER
+  ADMIN
+}
+
+enum Provider {
+  GMAIL
+  OUTLOOK
+  YAHOO
+}
+
+enum Category {
+  MEETINGS
+  DELIVERY
+  INTERVIEWS
+  OTHER
+}
+
+enum Priority {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum Sentiment {
+  POSITIVE
+  NEUTRAL
+  NEGATIVE
+}

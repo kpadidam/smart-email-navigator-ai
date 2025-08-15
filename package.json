@@ -10,7 +10,13 @@
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test:oauth": "cd backend && npm run test:oauth"
+    "test:oauth": "cd backend && npm run test:oauth",
+    "backend:dev": "cd backend && npm run dev",
+    "backend:start": "cd backend && npm start",
+    "prisma:generate": "cd backend && npx prisma generate",
+    "prisma:migrate": "cd backend && npx prisma migrate dev",
+    "prisma:deploy": "cd backend && npx prisma migrate deploy",
+    "prisma:studio": "cd backend && npx prisma studio"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",

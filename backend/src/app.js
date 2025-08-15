@@ -6,10 +6,10 @@ dotenv.config();
 import express from 'express';                                                                                                                                                                         
 import cors from 'cors';                                                                                                                                                                               
 import helmet from 'helmet';                                                                                                                                                                           
-import mongoose from 'mongoose';                                                                                                                                                                       
 import rateLimit from 'express-rate-limit';                                                                                                                                                            
 import { createServer } from 'http';                                                                                                                                                                   
-import { Server } from 'socket.io';                                                                                                                                                                    
+import { Server } from 'socket.io';
+import { connectDB } from './config/database.js';                                                                                                                                                                    
                                                                                                                                                                                                        
 // Import routes                                                                                                                                                                                       
 import authRoutes from './routes/auth.js';
@@ -35,6 +35,9 @@ const allowedOrigins = [
   "http://10.0.0.131:8080",
   "http://10.0.0.131:8081",
   "http://10.0.0.131:8082",
+  "http://192.168.110.188:8080",
+  "http://192.168.110.188:8081",
+  "http://192.168.110.188:8082",
   process.env.FRONTEND_URL
 ].filter(Boolean);
 
@@ -144,10 +147,8 @@ app.use(limiter);
 app.use(express.json({ limit: '10mb' }));                                                                                                                                                              
 app.use(express.urlencoded({ extended: true }));                                                                                                                                                       
                                                                                                                                                                                                        
-// Connect to MongoDB                                                                                                                                                                                  
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/email-management')                                                                                                              
-  .then(() => logger.info('Connected to MongoDB'))                                                                                                                                                     
-  .catch(err => logger.error('MongoDB connection error:', err));                                                                                                                                       
+// Connect to PostgreSQL via Prisma                                                                                                                                                                                  
+connectDB();                                                                                                                                       
                                                                                                                                                                                                        
 // Routes                                                                                                                                                                                              
 app.use('/api/auth', authRoutes);
@@ -185,8 +186,8 @@ app.use('*', (req, res) => {
 });                                                                                                                                                                                                    
                                                                                                                                                                                                        
 const PORT = process.env.PORT || 5001;                                                                                                                                                                 
-httpServer.listen(PORT, () => {                                                                                                                                                                            
-  logger.info(`Server is running on port ${PORT}`);                                                                                                                                                       
+httpServer.listen(PORT, '0.0.0.0', () => {                                                                                                                                                                            
+  logger.info(`Server is running on port ${PORT} and accessible from all interfaces`);                                                                                                                                                       
   logger.info(`Socket.IO server initialized`);                                                                                                                                                         
 });                                                                                                                                                                                                    
                                                                                                                                                                                                        

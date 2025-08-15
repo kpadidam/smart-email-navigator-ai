@@ -10,6 +10,12 @@ const emailSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
+  // Track which account this email came from - 'primary' for User model, ObjectId for EmailAccount model
+  accountId: {
+    type: mongoose.Schema.Types.Mixed, // Can be string ('primary') or ObjectId
+    required: true,
+    default: 'primary'
+  },
   gmailId: {
     type: String,
     required: true,
@@ -101,6 +107,7 @@ const emailSchema = new mongoose.Schema({
 // Indexes for efficient queries
 emailSchema.index({ userId: 1, receivedAt: -1 });
 emailSchema.index({ emailAccountId: 1, receivedAt: -1 });
+emailSchema.index({ userId: 1, accountId: 1, receivedAt: -1 }); // For multi-account filtering
 // Note: gmailId index is already created by unique: true
 emailSchema.index({ userId: 1, gmailId: 1 });
 emailSchema.index({ 'from.email': 1 });

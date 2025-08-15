@@ -1,4 +1,3 @@
-
 import { authService } from './authService';
 import { logger } from '../utils/logger';
 
@@ -25,6 +24,24 @@ export interface EmailStats {
   unreadEmails: number;
   categorizedEmails: number;
   pendingActions: number;
+}
+
+export interface EmailAccount {
+  id: string;
+  email: string;
+  provider: string;
+  isPrimary: boolean;
+  lastSyncAt?: string;
+  createdAt?: string;
+}
+
+export interface EmailAccountsResponse {
+  accounts: EmailAccount[];
+}
+
+export interface SwitchAccountResponse {
+  message: string;
+  activeAccount: EmailAccount;
 }
 
 export const emailService = {
@@ -90,27 +107,139 @@ export const emailService = {
     return data;
   },
 
-  async syncEmails(): Promise<{ message: string; emailsSynced: number; totalFetched: number }> {
+  /**
+   * Sync emails from Gmail for the specified account
+   */
+  async syncEmails(accountId?: string): Promise<{ message: string; emailsSynced: number; totalFetched: number; accountId?: string }> {
     const startTime = Date.now();
-    logger.email('Starting email sync');
+    logger.email('Starting email sync', { accountId });
+    
+    const body: { accountId?: string } = {};
+    if (accountId) body.accountId = accountId;
     
     const response = await authService.makeAuthenticatedRequest(`${API_URL}/api/emails/sync`, {
       method: 'POST',
+      body: JSON.stringify(body),
     });
     
     const duration = Date.now() - startTime;
     
     if (!response.ok) {
-      logger.api(`POST /api/emails/sync → ${response.status} (${duration}ms)`, { status: response.status, duration });
-      throw new Error('Failed to sync emails');
+      logger.api(`POST /api/emails/sync → ${response.status} (${duration}ms)`, { status: response.status, duration, accountId });
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `Failed to sync emails: ${response.status}`);
     }
     
     const data = await response.json();
     logger.email('Email sync completed', { 
       emailsSynced: data.emailsSynced, 
       totalFetched: data.totalFetched, 
+      accountId: data.accountId,
       duration 
     });
     return data;
-  }
+  },
+
+  /**
+   * Get all email accounts for the authenticated user
+   */
+  async getEmailAccounts(): Promise<EmailAccountsResponse> {
+    const response = await fetch(`${API_URL}/api/emails/accounts`, {
+      method: 'GET',
+      headers: authService.getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      authService.handleAuthError(response);
+      throw new Error(`Failed to fetch email accounts: ${response.status}`);
+    }
+
+    return response.json();
+  },
+
+  /**
+   * Switch to a different email account
+   */
+  async switchAccount(accountId: string): Promise<SwitchAccountResponse> {
+    const response = await fetch(`${API_URL}/api/emails/accounts/switch`, {
+      method: 'POST',
+      headers: authService.getAuthHeaders(),
+      body: JSON.stringify({ accountId }),
+    });
+
+    if (!response.ok) {
+      authService.handleAuthError(response);
+      throw new Error(`Failed to switch account: ${response.status}`);
+    }
+
+    return response.json();
+  },
+
+  /**
+   * Add a new email account (initiate OAuth flow)
+   */
+  async addEmailAccount(userId: string): Promise<{ authUrl: string }> {
+    const response = await fetch(`${API_URL}/api/auth/add-account/google?userId=${userId}`, {
+      method: 'GET',
+      headers: authService.getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to initiate add account flow: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data;
+  },
+
+  /**
+   * Get emails with filtering options
+   */
+  async getEmails(filters: {
+    category?: string;
+    search?: string;
+    limit?: number;
+    offset?: number;
+    accountId?: string;
+  } = {}): Promise<{ emails: Email[]; total: number }> {
+    const params = new URLSearchParams();
+    
+    if (filters.category) params.append('category', filters.category);
+    if (filters.search) params.append('search', filters.search);
+    if (filters.limit) params.append('limit', filters.limit.toString());
+    if (filters.offset) params.append('offset', filters.offset.toString());
+    if (filters.accountId) params.append('accountId', filters.accountId);
+
+    const response = await fetch(`${API_URL}/api/emails?${params}`, {
+      headers: authService.getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      authService.handleAuthError(response);
+      throw new Error(`Failed to fetch emails: ${response.status}`);
+    }
+
+    return response.json();
+  },
+
+  /**
+   * Get email statistics
+   */
+  async getStats(accountId?: string): Promise<EmailStats> {
+    const params = new URLSearchParams();
+    if (accountId) params.append('accountId', accountId);
+
+    const response = await fetch(`${API_URL}/api/emails/stats?${params}`, {
+      headers: authService.getAuthHeaders(),
+    });
+
+    if (!response.ok) {
+      authService.handleAuthError(response);
+      throw new Error(`Failed to fetch email stats: ${response.status}`);
+    }
+
+    return response.json();
+  },
+
+
 }; 
