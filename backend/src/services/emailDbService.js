@@ -201,4 +201,6 @@ class EmailDbService {
   }
 }
 
-export default new EmailDbService();
+const emailDbService = new EmailDbService();
+export { emailDbService };
+export default emailDbService;
