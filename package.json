@@ -5,9 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "start": "vite",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:all": "concurrently \"npm run dev\" \"npm run dev:backend\"",
     "build": "vite build",
-    "build:dev": "vite build --mode development",
+    "build:prod": "npm run build && cd backend && npm install --production",
+    "start": "node server.js",
+    "start:prod": "NODE_ENV=production node server.js",
     "lint": "eslint .",
     "preview": "vite preview",
     "test:oauth": "cd backend && npm run test:oauth",
@@ -16,7 +19,10 @@
     "prisma:generate": "cd backend && npx prisma generate",
     "prisma:migrate": "cd backend && npx prisma migrate dev",
     "prisma:deploy": "cd backend && npx prisma migrate deploy",
-    "prisma:studio": "cd backend && npx prisma studio"
+    "prisma:studio": "cd backend && npx prisma studio",
+    "postinstall": "cd backend && npm install",
+    "railway:build": "npm run build && cd backend && npm install --production && npx prisma generate",
+    "railway:start": "npx prisma migrate deploy && node server.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",

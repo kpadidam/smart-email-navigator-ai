@@ -35,9 +35,14 @@ const httpServer = createServer(app);
 // CORS configuration - Updated to include all frontend origins including Lovable
 const allowedOrigins = [
   /\.lovable\.app$/,
+  /\.railway\.app$/,  // Allow all Railway apps
+  /\.vercel\.app$/,   // Allow Vercel deployments
+  /\.netlify\.app$/,  // Allow Netlify deployments
   "http://localhost:8080",
   "http://localhost:8081",
   "http://localhost:8082",
+  "http://localhost:3000",
+  "http://localhost:5173",
   "http://10.0.0.131:8080",
   "http://10.0.0.131:8081",
   "http://10.0.0.131:8082",
@@ -47,7 +52,8 @@ const allowedOrigins = [
   "http://192.168.110.14:8080",
   "http://192.168.110.14:8081",
   "http://192.168.110.14:8082",
-  process.env.FRONTEND_URL
+  process.env.FRONTEND_URL,
+  process.env.PRODUCTION_FRONTEND_URL
 ].filter(Boolean);
 
 const corsOptions = {
@@ -194,10 +200,14 @@ app.use('*', (req, res) => {
   res.status(404).json({ error: 'Route not found' });                                                                                                                                                  
 });                                                                                                                                                                                                    
                                                                                                                                                                                                        
-const PORT = process.env.PORT || 5001;                                                                                                                                                                 
-httpServer.listen(PORT, '0.0.0.0', () => {                                                                                                                                                                            
-  logger.info(`Server is running on port ${PORT} and accessible from all interfaces`);                                                                                                                                                       
-  logger.info(`Socket.IO server initialized`);                                                                                                                                                         
-});                                                                                                                                                                                                    
+// Only start server if this file is run directly
+if (import.meta.url === `file://${process.argv[1]}`) {
+  const PORT = process.env.PORT || 5001;                                                                                                                                                                 
+  httpServer.listen(PORT, '0.0.0.0', () => {                                                                                                                                                                            
+    logger.info(`Server is running on port ${PORT} and accessible from all interfaces`);                                                                                                                                                       
+    logger.info(`Socket.IO server initialized`);                                                                                                                                                         
+  });
+}                                                                                                                                                                                                    
                                                                                                                                                                                                        
+export { app, httpServer, io };
 export default app;  

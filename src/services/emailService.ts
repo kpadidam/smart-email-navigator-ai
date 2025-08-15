@@ -1,7 +1,9 @@
 import { authService } from './authService';
 import { logger } from '../utils/logger';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001';
+// In production, use relative URLs since frontend and backend are served from same origin
+const API_URL = import.meta.env.VITE_API_URL || 
+  (window.location.hostname === 'localhost' ? 'http://localhost:5001' : '');
 
 export interface Email {
   id: string;
