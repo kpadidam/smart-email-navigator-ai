@@ -1,0 +1,831 @@
+/* Microsoft Outlook Web - Exact UI Styles */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+:root {
+    /* Microsoft Fluent Design Colors */
+    --ms-primary: #0078d4;
+    --ms-primary-hover: #106ebe;
+    --ms-primary-active: #005a9e;
+    --ms-secondary: #323130;
+    --ms-light: #f3f2f1;
+    --ms-lighter: #faf9f8;
+    --ms-white: #ffffff;
+    --ms-black: #000000;
+    --ms-gray: #605e5c;
+    --ms-gray-light: #a19f9d;
+    --ms-gray-lighter: #edebe9;
+    --ms-border: #e1dfdd;
+    --ms-shadow: 0 1.6px 3.6px 0 rgba(0,0,0,.132), 0 0.3px 0.9px 0 rgba(0,0,0,.108);
+    --ms-shadow-lg: 0 6.4px 14.4px 0 rgba(0,0,0,.132), 0 1.2px 3.6px 0 rgba(0,0,0,.108);
+}
+
+body {
+    font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, "Helvetica Neue", sans-serif;
+    font-size: 14px;
+    color: var(--ms-secondary);
+    background: var(--ms-white);
+    overflow: hidden;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* App Container */
+.outlook-app {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    background: var(--ms-white);
+}
+
+/* Login Screen */
+.login-screen {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--ms-lighter);
+    z-index: 9999;
+}
+
+.login-screen.active {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.login-container {
+    width: 100%;
+    max-width: 440px;
+    padding: 20px;
+}
+
+.login-box {
+    background: var(--ms-white);
+    border-radius: 2px;
+    box-shadow: var(--ms-shadow);
+    padding: 44px;
+    text-align: left;
+}
+
+.ms-logo {
+    height: 24px;
+    margin-bottom: 16px;
+}
+
+.login-box h2 {
+    font-size: 24px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: var(--ms-secondary);
+}
+
+.login-box p {
+    color: var(--ms-gray);
+    margin-bottom: 20px;
+}
+
+.login-btn {
+    width: 100%;
+    padding: 12px 16px;
+    border: 1px solid var(--ms-border);
+    background: var(--ms-white);
+    border-radius: 2px;
+    font-size: 15px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    transition: all 0.1s ease;
+}
+
+.login-btn:hover {
+    background: var(--ms-lighter);
+    border-color: var(--ms-gray-light);
+}
+
+.google-icon {
+    flex-shrink: 0;
+}
+
+.login-footer {
+    margin-top: 16px;
+}
+
+.login-footer a {
+    color: var(--ms-primary);
+    text-decoration: none;
+    font-size: 13px;
+}
+
+.login-footer a:hover {
+    text-decoration: underline;
+}
+
+/* Main Outlook Interface */
+.outlook-main {
+    display: none;
+    flex-direction: column;
+    height: 100vh;
+}
+
+.outlook-main.active {
+    display: flex;
+}
+
+/* Header */
+.outlook-header {
+    height: 48px;
+    background: var(--ms-primary);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 8px;
+    flex-shrink: 0;
+}
+
+.header-left,
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.header-center {
+    flex: 1;
+    max-width: 640px;
+    margin: 0 16px;
+}
+
+/* App Launcher Button */
+.app-launcher {
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    color: var(--ms-white);
+    cursor: pointer;
+    transition: background 0.1s ease;
+}
+
+.app-launcher:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/* App Name */
+.app-name {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 12px;
+    color: var(--ms-white);
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.outlook-logo {
+    width: 24px;
+    height: 24px;
+    border-radius: 2px;
+}
+
+/* Search Box */
+.search-box {
+    position: relative;
+    width: 100%;
+}
+
+.search-box input {
+    width: 100%;
+    height: 32px;
+    padding: 0 12px 0 36px;
+    border: none;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.95);
+    font-size: 14px;
+    outline: none;
+}
+
+.search-box input:focus {
+    background: var(--ms-white);
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.3);
+}
+
+.search-icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--ms-gray);
+    pointer-events: none;
+}
+
+/* Header Buttons */
+.header-btn {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    color: var(--ms-white);
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background 0.1s ease;
+}
+
+.header-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/* User Profile */
+.user-profile {
+    margin-left: 8px;
+}
+
+.profile-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    overflow: hidden;
+    padding: 0;
+}
+
+.profile-btn img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* Command Bar */
+.command-bar {
+    height: 44px;
+    background: var(--ms-lighter);
+    border-bottom: 1px solid var(--ms-border);
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 4px;
+    flex-shrink: 0;
+}
+
+.cmd-btn {
+    height: 32px;
+    padding: 0 12px;
+    border: none;
+    background: transparent;
+    border-radius: 2px;
+    font-size: 14px;
+    color: var(--ms-secondary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.1s ease;
+    white-space: nowrap;
+}
+
+.cmd-btn:hover {
+    background: var(--ms-light);
+}
+
+.cmd-btn:active {
+    background: var(--ms-border);
+}
+
+.cmd-btn.primary {
+    background: var(--ms-primary);
+    color: var(--ms-white);
+}
+
+.cmd-btn.primary:hover {
+    background: var(--ms-primary-hover);
+}
+
+.cmd-separator {
+    width: 1px;
+    height: 20px;
+    background: var(--ms-border);
+    margin: 0 4px;
+}
+
+/* Main Content Area */
+.outlook-content {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+}
+
+/* Left Navigation */
+.left-nav {
+    width: 260px;
+    background: var(--ms-lighter);
+    border-right: 1px solid var(--ms-border);
+    overflow-y: auto;
+    flex-shrink: 0;
+}
+
+.folder-section {
+    padding: 12px 0;
+    border-bottom: 1px solid var(--ms-border);
+}
+
+.folder-header {
+    padding: 8px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--ms-gray);
+    text-transform: uppercase;
+}
+
+.folder-action {
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    color: var(--ms-gray);
+    cursor: pointer;
+    border-radius: 2px;
+}
+
+.folder-action:hover {
+    background: var(--ms-light);
+}
+
+.folder-tree {
+    padding: 0 8px;
+}
+
+.folder-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: 2px;
+    cursor: pointer;
+    transition: all 0.1s ease;
+    font-size: 14px;
+    color: var(--ms-secondary);
+}
+
+.folder-item:hover {
+    background: var(--ms-light);
+}
+
+.folder-item.active {
+    background: var(--ms-light);
+    font-weight: 600;
+}
+
+.folder-item svg {
+    flex-shrink: 0;
+    color: var(--ms-gray);
+}
+
+.folder-name {
+    flex: 1;
+}
+
+.folder-count {
+    font-size: 12px;
+    color: var(--ms-gray);
+    font-weight: normal;
+}
+
+/* Splitters */
+.splitter {
+    width: 4px;
+    background: transparent;
+    cursor: col-resize;
+    position: relative;
+    flex-shrink: 0;
+}
+
+.splitter:hover {
+    background: var(--ms-border);
+}
+
+.splitter:active {
+    background: var(--ms-primary);
+}
+
+/* Email List */
+.email-list-pane {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: var(--ms-white);
+    min-width: 320px;
+}
+
+.list-header {
+    height: 40px;
+    padding: 0 16px;
+    border-bottom: 1px solid var(--ms-border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--ms-lighter);
+}
+
+.list-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.select-all {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
+.filter-btn,
+.sort-btn {
+    padding: 4px 8px;
+    border: none;
+    background: transparent;
+    border-radius: 2px;
+    font-size: 14px;
+    color: var(--ms-secondary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.filter-btn:hover,
+.sort-btn:hover {
+    background: var(--ms-light);
+}
+
+.view-controls {
+    display: flex;
+    gap: 4px;
+}
+
+.view-btn {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    border-radius: 2px;
+    color: var(--ms-gray);
+    cursor: pointer;
+}
+
+.view-btn:hover {
+    background: var(--ms-light);
+}
+
+.view-btn.active {
+    background: var(--ms-light);
+    color: var(--ms-primary);
+}
+
+/* Email List */
+.email-list {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.loading-message {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 200px;
+    color: var(--ms-gray);
+}
+
+.spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid var(--ms-border);
+    border-top-color: var(--ms-primary);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 16px;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Email Item */
+.email-item {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--ms-lighter);
+    cursor: pointer;
+    transition: background 0.1s ease;
+}
+
+.email-item:hover {
+    background: var(--ms-lighter);
+}
+
+.email-item.selected {
+    background: #e5f3ff;
+}
+
+.email-item.unread {
+    font-weight: 600;
+}
+
+.email-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+}
+
+.email-sender {
+    font-size: 14px;
+    color: var(--ms-secondary);
+}
+
+.email-time {
+    font-size: 12px;
+    color: var(--ms-gray);
+    font-weight: normal;
+}
+
+.email-subject {
+    font-size: 14px;
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.email-preview {
+    font-size: 13px;
+    color: var(--ms-gray);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: normal;
+}
+
+/* Reading Pane */
+.reading-pane {
+    flex: 1;
+    background: var(--ms-white);
+    border-left: 1px solid var(--ms-border);
+    display: flex;
+    flex-direction: column;
+    min-width: 400px;
+}
+
+.no-message {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: var(--ms-gray);
+}
+
+.no-message p {
+    font-size: 20px;
+    margin-top: 16px;
+}
+
+.no-message span {
+    font-size: 14px;
+    margin-top: 8px;
+}
+
+/* Email Content */
+.email-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.email-toolbar {
+    height: 44px;
+    border-bottom: 1px solid var(--ms-border);
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    gap: 8px;
+    background: var(--ms-lighter);
+}
+
+.email-header-detail {
+    padding: 20px;
+    border-bottom: 1px solid var(--ms-border);
+}
+
+.email-subject-detail {
+    font-size: 20px;
+    font-weight: 600;
+    margin-bottom: 16px;
+    color: var(--ms-secondary);
+}
+
+.email-sender-detail {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.sender-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--ms-primary);
+    color: var(--ms-white);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 16px;
+}
+
+.sender-info {
+    flex: 1;
+}
+
+.sender-name {
+    font-weight: 600;
+    color: var(--ms-secondary);
+}
+
+.sender-email {
+    font-size: 13px;
+    color: var(--ms-gray);
+}
+
+.email-date {
+    font-size: 13px;
+    color: var(--ms-gray);
+}
+
+.email-body {
+    flex: 1;
+    padding: 20px;
+    overflow-y: auto;
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--ms-secondary);
+}
+
+/* Status Bar */
+.status-bar {
+    height: 24px;
+    background: var(--ms-primary);
+    color: var(--ms-white);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    font-size: 12px;
+    flex-shrink: 0;
+}
+
+/* Toast Container */
+.toast-container {
+    position: fixed;
+    top: 60px;
+    right: 20px;
+    z-index: 1000;
+}
+
+.toast {
+    background: var(--ms-white);
+    border: 1px solid var(--ms-border);
+    border-radius: 2px;
+    padding: 12px 16px;
+    margin-bottom: 8px;
+    box-shadow: var(--ms-shadow-lg);
+    min-width: 300px;
+    animation: slideIn 0.3s ease;
+}
+
+.toast.success {
+    border-left: 4px solid #107c10;
+}
+
+.toast.error {
+    border-left: 4px solid #d13438;
+}
+
+.toast.info {
+    border-left: 4px solid var(--ms-primary);
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+/* Responsive Design */
+@media (max-width: 1024px) {
+    .left-nav {
+        width: 200px;
+    }
+    
+    .reading-pane {
+        min-width: 300px;
+    }
+}
+
+@media (max-width: 768px) {
+    .outlook-content {
+        position: relative;
+    }
+    
+    .left-nav {
+        position: absolute;
+        left: -260px;
+        top: 0;
+        bottom: 0;
+        z-index: 100;
+        transition: left 0.3s ease;
+        box-shadow: 2px 0 8px rgba(0,0,0,0.1);
+    }
+    
+    .left-nav.active {
+        left: 0;
+    }
+    
+    .email-list-pane {
+        min-width: 100%;
+    }
+    
+    .reading-pane {
+        position: absolute;
+        right: -100%;
+        top: 0;
+        bottom: 0;
+        width: 100%;
+        min-width: 100%;
+        transition: right 0.3s ease;
+        z-index: 90;
+    }
+    
+    .reading-pane.active {
+        right: 0;
+    }
+    
+    .splitter {
+        display: none;
+    }
+}
+
+/* Dark Mode Support */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --ms-white: #1f1f1f;
+        --ms-lighter: #2d2d2d;
+        --ms-light: #3d3d3d;
+        --ms-border: #484644;
+        --ms-secondary: #f3f2f1;
+        --ms-gray: #a19f9d;
+        --ms-gray-light: #8a8886;
+    }
+    
+    .login-screen {
+        background: #000;
+    }
+    
+    .search-box input {
+        background: rgba(255, 255, 255, 0.1);
+        color: var(--ms-white);
+    }
+    
+    .search-box input:focus {
+        background: rgba(255, 255, 255, 0.15);
+    }
+}
