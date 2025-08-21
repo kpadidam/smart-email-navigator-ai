@@ -1,0 +1,189 @@
+PROGRAM DataStore
+BEGIN
+    DECLARE dbConnection AS DATABASE
+    DECLARE dbPath AS STRING
+    
+    dbPath = "./email_navigator.db"
+    
+    FUNCTION Initialize()
+    BEGIN
+        PRINT "Initializing database..."
+        
+        dbConnection = OpenDatabase(dbPath)
+        
+        IF dbConnection IS NULL THEN
+            PRINT "Creating new database"
+            CreateDatabase()
+        END IF
+        
+        CreateTables()
+        PRINT "Database ready"
+    END
+    
+    FUNCTION CreateTables()
+    BEGIN
+        DECLARE sql AS STRING
+        
+        // Create users table
+        sql = "CREATE TABLE IF NOT EXISTS users (
+            id TEXT PRIMARY KEY,
+            email TEXT UNIQUE,
+            name TEXT,
+            google_id TEXT,
+            token TEXT,
+            created_at TIMESTAMP
+        )"
+        dbConnection.Execute(sql)
+        
+        // Create emails table
+        sql = "CREATE TABLE IF NOT EXISTS emails (
+            id TEXT PRIMARY KEY,
+            user_id TEXT,
+            gmail_id TEXT UNIQUE,
+            sender TEXT,
+            sender_email TEXT,
+            subject TEXT,
+            body TEXT,
+            category TEXT,
+            confidence REAL,
+            received_at TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        )"
+        dbConnection.Execute(sql)
+    END
+    
+    FUNCTION SaveUser(userInfo)
+    BEGIN
+        DECLARE sql AS STRING
+        DECLARE userId AS STRING
+        
+        userId = GenerateID()
+        
+        sql = "INSERT OR REPLACE INTO users (id, email, name, google_id, token, created_at)
+               VALUES (?, ?, ?, ?, ?, ?)"
+        
+        dbConnection.Execute(sql, 
+            userId,
+            userInfo.email,
+            userInfo.name,
+            userInfo.google_id,
+            userInfo.token,
+            GetCurrentTime()
+        )
+        
+        RETURN userId
+    END
+    
+    FUNCTION SaveEmails(emails)
+    BEGIN
+        DECLARE sql AS STRING
+        DECLARE savedCount AS INTEGER
+        
+        savedCount = 0
+        
+        FOR EACH email IN emails DO
+            sql = "INSERT OR IGNORE INTO emails 
+                   (id, user_id, gmail_id, sender, sender_email, subject, body, received_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
+            
+            dbConnection.Execute(sql,
+                GenerateID(),
+                GetCurrentUserId(),
+                email.gmail_id,
+                email.sender,
+                email.sender_email,
+                email.subject,
+                email.body,
+                email.date
+            )
+            
+            savedCount = savedCount + 1
+        END FOR
+        
+        RETURN savedCount
+    END
+    
+    FUNCTION UpdateEmail(email)
+    BEGIN
+        DECLARE sql AS STRING
+        
+        sql = "UPDATE emails 
+               SET category = ?, confidence = ?
+               WHERE id = ?"
+        
+        dbConnection.Execute(sql,
+            email.category,
+            email.confidence,
+            email.id
+        )
+    END
+    
+    FUNCTION GetAllEmails()
+    BEGIN
+        DECLARE sql AS STRING
+        DECLARE emails AS ARRAY
+        
+        sql = "SELECT * FROM emails 
+               WHERE user_id = ?
+               ORDER BY received_at DESC
+               LIMIT 100"
+        
+        emails = dbConnection.Query(sql, GetCurrentUserId())
+        
+        RETURN emails
+    END
+    
+    FUNCTION GetEmailsByCategory(category)
+    BEGIN
+        DECLARE sql AS STRING
+        DECLARE emails AS ARRAY
+        
+        sql = "SELECT * FROM emails 
+               WHERE user_id = ? AND category = ?
+               ORDER BY received_at DESC
+               LIMIT 100"
+        
+        emails = dbConnection.Query(sql, GetCurrentUserId(), category)
+        
+        RETURN emails
+    END
+    
+    FUNCTION IsTokenValid(token)
+    BEGIN
+        DECLARE sql AS STRING
+        DECLARE result AS RECORD
+        
+        sql = "SELECT * FROM users WHERE token = ?"
+        result = dbConnection.QueryOne(sql, token)
+        
+        IF result IS NOT NULL THEN
+            RETURN TRUE
+        ELSE
+            RETURN FALSE
+        END IF
+    END
+    
+    FUNCTION GetUserByToken(token)
+    BEGIN
+        DECLARE sql AS STRING
+        DECLARE user AS RECORD
+        
+        sql = "SELECT * FROM users WHERE token = ?"
+        user = dbConnection.QueryOne(sql, token)
+        
+        RETURN user
+    END
+    
+    FUNCTION GenerateID()
+    BEGIN
+        DECLARE id AS STRING
+        id = RandomString(16)
+        RETURN id
+    END
+    
+    FUNCTION CloseDatabase()
+    BEGIN
+        dbConnection.Close()
+        PRINT "Database closed"
+    END
+END

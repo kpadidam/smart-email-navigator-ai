@@ -242,7 +242,7 @@ async def sync_emails(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Sync emails from Gmail"""
+    """Sync emails from Gmail with AI categorization"""
     result = sync_gmail_emails(current_user.id, db)
     
     if not result["success"]:
@@ -254,10 +254,83 @@ async def sync_emails(
         )
     
     return SyncResponse(
-        message="Emails synced successfully",
+        message="Emails synced and categorized successfully",
         emailsSynced=result["emailsSynced"],
         totalFetched=result["totalFetched"]
     )
+
+@app.post("/api/emails/categorize/{email_id}")
+async def categorize_single_email(
+    email_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Re-categorize a single email using AI"""
+    from ai_categorizer import get_categorizer
+    
+    email = db.query(Email).filter(
+        Email.id == email_id,
+        Email.user_id == current_user.id
+    ).first()
+    
+    if not email:
+        raise HTTPException(status_code=404, detail="Email not found")
+    
+    # Prepare email data for categorizer
+    email_data = {
+        "subject": email.subject,
+        "body": email.full_content,
+        "sender_email": email.sender_email,
+        "sender": email.sender
+    }
+    
+    # Get AI categorization
+    categorizer = get_categorizer()
+    category, confidence, metadata = categorizer.categorize(email_data)
+    
+    # Update email with new category
+    email.category = category
+    db.commit()
+    
+    return {
+        "email_id": email_id,
+        "category": category,
+        "confidence": confidence,
+        "metadata": metadata
+    }
+
+@app.get("/api/emails/category-stats")
+async def get_category_statistics(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get statistics about email categories"""
+    from ai_categorizer import get_categorizer
+    
+    # Get all user emails
+    emails = db.query(Email).filter(Email.user_id == current_user.id).all()
+    
+    # Prepare emails for stats
+    email_data = [
+        {
+            "id": email.id,
+            "category": email.category,
+            "subject": email.subject
+        }
+        for email in emails
+    ]
+    
+    # Get category distribution
+    category_counts = {}
+    for email in email_data:
+        cat = email.get("category", "uncategorized")
+        category_counts[cat] = category_counts.get(cat, 0) + 1
+    
+    return {
+        "total_emails": len(emails),
+        "categories": category_counts,
+        "last_sync": emails[-1].created_at.isoformat() if emails else None
+    }
 
 @app.get("/api/emails/{email_id}", response_model=EmailResponse)
 async def get_email_by_id(

@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-import jwt
+from jose import jwt
 import httpx
 import base64
 import re
@@ -198,7 +198,7 @@ def verify_token(token: str) -> Optional[Dict[str, Any]]:
     try:
         payload = jwt.decode(token, config.JWT_SECRET, algorithms=[config.JWT_ALGORITHM])
         return payload
-    except jwt.PyJWTError:
+    except jwt.JWTError:
         return None
 
 def get_user_from_token(token: str, db: Session) -> Optional[User]:
@@ -472,10 +472,15 @@ def sync_gmail_emails(user_id: str, db: Session) -> Dict[str, Any]:
             if not details:
                 continue
             
-            # Categorize email (simplified)
-            category = categorize_email(details['subject'], details['body'])
+            # AI-powered categorization with confidence scoring
+            category, confidence = categorize_email(
+                details['subject'], 
+                details['body'],
+                details.get('senderEmail', ''),
+                details.get('sender', '')
+            )
             
-            # Create email record
+            # Create email record with AI categorization
             email = Email(
                 gmail_id=msg['id'],
                 thread_id=details['threadId'],
@@ -508,23 +513,48 @@ def sync_gmail_emails(user_id: str, db: Session) -> Dict[str, Any]:
         print(f"Error syncing emails: {e}")
         return {"success": False, "error": str(e)}
 
-def categorize_email(subject: str, body: str) -> str:
-    """Simple email categorization"""
-    text = (subject + " " + body).lower()
-    
-    # Simple keyword-based categorization
-    if any(word in text for word in ['meeting', 'schedule', 'calendar', 'appointment']):
-        return 'Meeting'
-    elif any(word in text for word in ['invoice', 'payment', 'billing', 'receipt']):
-        return 'Finance'
-    elif any(word in text for word in ['project', 'deadline', 'task', 'assignment']):
-        return 'Work'
-    elif any(word in text for word in ['newsletter', 'unsubscribe', 'promotional']):
-        return 'Promotions'
-    elif any(word in text for word in ['friend', 'family', 'personal']):
-        return 'Personal'
-    else:
-        return 'General'
+def categorize_email(subject: str, body: str, sender_email: str = "", sender_name: str = "") -> tuple:
+    """AI-powered email categorization with confidence scoring"""
+    # Try enhanced categorizer first, fallback to basic if needed
+    try:
+        from enhanced_email_categorizer import get_enhanced_categorizer
+        
+        # Prepare email data for enhanced categorizer
+        email_data = {
+            "subject": subject,
+            "body": body,
+            "sender": sender_email or sender_name,
+            "sender_email": sender_email
+        }
+        
+        # Get enhanced AI categorization
+        categorizer = get_enhanced_categorizer(use_ai=True)
+        result = categorizer.categorize(email_data)
+        
+        # Extract category and confidence
+        category = result.get('category', 'Important')
+        confidence = result.get('confidence', 0.7)
+        
+        # Store metadata if needed (for future use)
+        metadata = result.get('metadata', {})
+        
+        return category, confidence
+        
+    except ImportError:
+        # Fallback to original categorizer if enhanced not available
+        from ai_categorizer import get_categorizer
+        
+        email_data = {
+            "subject": subject,
+            "body": body,
+            "sender_email": sender_email,
+            "sender": sender_name
+        }
+        
+        categorizer = get_categorizer()
+        category, confidence, metadata = categorizer.categorize(email_data)
+        
+        return category, confidence
 
 def determine_priority(subject: str, sender: str) -> str:
     """Determine email priority"""
@@ -626,26 +656,44 @@ def create_mock_emails(user_id: str, db: Session):
             "subject": "Project Update - Q4 Planning",
             "summary": "Latest updates on the Q4 project timeline and deliverables",
             "full_content": "Hi team,\n\nI wanted to share the latest updates on our Q4 project planning. We've made significant progress on the following items:\n\n1. Completed market research\n2. Finalized technical specifications\n3. Started development phase\n\nPlease review the attached documents and provide your feedback by end of week.\n\nBest regards,\nJohn",
-            "category": "Work",
+            "category": "Important",
             "priority": "high"
         },
         {
             "sender": "Jane Smith",
             "sender_email": "jane@example.com",
-            "subject": "Meeting Tomorrow - 2PM",
-            "summary": "Reminder about tomorrow's team meeting",
-            "full_content": "Hi,\n\nJust a quick reminder about our team meeting tomorrow at 2 PM in Conference Room B. We'll be discussing:\n\n- Sprint retrospective\n- Next sprint planning\n- Resource allocation\n\nSee you there!\nJane",
-            "category": "Meeting",
+            "subject": "Team Sync Meeting Tomorrow - 2PM",
+            "summary": "Reminder about tomorrow's team sync meeting",
+            "full_content": "Hi,\n\nJust a quick reminder about our team sync meeting tomorrow at 2 PM in Conference Room B. We'll be discussing:\n\n- Sprint retrospective\n- Next sprint planning\n- Resource allocation\n\nPlease join via Zoom: https://zoom.us/j/123456789\n\nSee you there!\nJane",
+            "category": "Meetings",
             "priority": "medium"
         },
         {
-            "sender": "Newsletter",
-            "sender_email": "news@techdigest.com",
-            "subject": "Weekly Tech Digest",
-            "summary": "This week's top technology news and updates",
-            "full_content": "Your weekly dose of tech news...",
-            "category": "Promotions",
+            "sender": "FedEx Tracking",
+            "sender_email": "tracking@fedex.com",
+            "subject": "Your package is on its way",
+            "summary": "Tracking update for your recent order",
+            "full_content": "Your package is being delivered today.\n\nTracking number: 1234567890\n\nExpected delivery: Today by 8 PM\n\nTrack your package: https://fedex.com/track",
+            "category": "Deliveries",
+            "priority": "normal"
+        },
+        {
+            "sender": "Suspicious Sender",
+            "sender_email": "noreply@suspicious-domain.xyz",
+            "subject": "You won $1000000 - Claim Now!",
+            "summary": "Congratulations! You've won a prize",
+            "full_content": "Dear winner,\n\nYou have won $1,000,000 in our lottery! Click here immediately to claim your prize before it expires.\n\nProvide your bank account and SSN to receive the funds.\n\nAct now - limited time only!",
+            "category": "Phishing/Spam/Scam",
             "priority": "low"
+        },
+        {
+            "sender": "Boss",
+            "sender_email": "boss@company.com",
+            "subject": "URGENT: Board presentation deadline tomorrow",
+            "summary": "Critical deadline for board presentation",
+            "full_content": "Team,\n\nThis is urgent - we need the board presentation completed by tomorrow morning.\n\nThe CEO will be reviewing it at 9 AM sharp.\n\nPlease prioritize this above all other tasks.\n\nThanks",
+            "category": "Important",
+            "priority": "high"
         }
     ]
     

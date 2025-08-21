@@ -1,0 +1,141 @@
+PROGRAM MainController
+BEGIN
+    DECLARE userToken AS STRING
+    DECLARE emailSync AS EmailSync
+    DECLARE aiCategorizer AS AICategorizer
+    DECLARE dataStore AS DataStore
+    DECLARE apiServer AS APIServer
+    
+    FUNCTION StartApplication()
+    BEGIN
+        PRINT "Starting Smart Email Categorizer..."
+        
+        // Initialize FastAPI server
+        apiServer = CreateFastAPIServer(port: 5001)
+        
+        // Setup API routes
+        apiServer.AddRoute("/api/auth/google", HandleGoogleAuth)
+        apiServer.AddRoute("/api/emails/sync", HandleEmailSync)
+        apiServer.AddRoute("/api/emails/categorize", HandleCategorize)
+        apiServer.AddRoute("/api/emails", HandleGetEmails)
+        
+        // Start server
+        apiServer.Start()
+        PRINT "Server running on port 5001"
+    END
+    
+    FUNCTION HandleGoogleAuth(request)
+    BEGIN
+        DECLARE authCode AS STRING
+        DECLARE userInfo AS RECORD
+        
+        authCode = request.GetParameter("code")
+        
+        IF authCode IS EMPTY THEN
+            RETURN Error(400, "No auth code provided")
+        END IF
+        
+        // Exchange code for token
+        userToken = GoogleOAuth.ExchangeCode(authCode)
+        
+        IF userToken IS VALID THEN
+            userInfo = GoogleAPI.GetUserInfo(userToken)
+            dataStore.SaveUser(userInfo)
+            RETURN Success(200, userToken)
+        ELSE
+            RETURN Error(401, "Authentication failed")
+        END IF
+    END
+    
+    FUNCTION HandleEmailSync(request)
+    BEGIN
+        DECLARE emails AS ARRAY
+        DECLARE syncResult AS BOOLEAN
+        
+        IF NOT ValidateToken(request.token) THEN
+            RETURN Error(401, "Invalid token")
+        END IF
+        
+        // Fetch emails from Gmail
+        emails = emailSync.FetchEmails(request.token, limit: 50)
+        
+        IF emails IS NOT EMPTY THEN
+            // Store raw emails
+            dataStore.SaveEmails(emails)
+            
+            // Trigger categorization
+            CALL CategorizeEmails(emails)
+            
+            RETURN Success(200, "Synced " + emails.count + " emails")
+        ELSE
+            RETURN Error(500, "Sync failed")
+        END IF
+    END
+    
+    FUNCTION CategorizeEmails(emails)
+    BEGIN
+        DECLARE category AS STRING
+        DECLARE confidence AS FLOAT
+        DECLARE processedCount AS INTEGER
+        
+        processedCount = 0
+        
+        FOR EACH email IN emails DO
+            // Call AI categorization
+            category = aiCategorizer.Categorize(email.content)
+            confidence = aiCategorizer.GetConfidence()
+            
+            // Update email with category
+            email.category = category
+            email.confidence = confidence
+            
+            // Save categorized email
+            dataStore.UpdateEmail(email)
+            
+            processedCount = processedCount + 1
+        END FOR
+        
+        PRINT "Categorized " + processedCount + " emails"
+    END
+    
+    FUNCTION HandleGetEmails(request)
+    BEGIN
+        DECLARE emails AS ARRAY
+        DECLARE filter AS STRING
+        
+        IF NOT ValidateToken(request.token) THEN
+            RETURN Error(401, "Invalid token")
+        END IF
+        
+        filter = request.GetParameter("category")
+        
+        IF filter IS NOT EMPTY THEN
+            emails = dataStore.GetEmailsByCategory(filter)
+        ELSE
+            emails = dataStore.GetAllEmails()
+        END IF
+        
+        RETURN Success(200, emails)
+    END
+    
+    FUNCTION ValidateToken(token)
+    BEGIN
+        IF token IS EMPTY THEN
+            RETURN FALSE
+        END IF
+        
+        IF dataStore.IsTokenValid(token) THEN
+            RETURN TRUE
+        ELSE
+            RETURN FALSE
+        END IF
+    END
+    
+    // Main execution
+    CALL StartApplication()
+    
+    WHILE TRUE DO
+        // Keep server running
+        WAIT 1
+    END WHILE
+END

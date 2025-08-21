@@ -1,0 +1,86 @@
+PROGRAM EnhancedEmailMain
+BEGIN
+    DECLARE categorizer AS EnhancedCategorizer
+    DECLARE dataStore AS EnhancedDataStore
+    DECLARE email AS RECORD
+    DECLARE result AS RECORD
+    
+    FUNCTION ProcessEmail(emailData)
+    BEGIN
+        PRINT "Processing email from: " + emailData.sender
+        
+        // Categorize the email
+        result = categorizer.CategorizeEmail(emailData)
+        
+        // Save to database
+        dataStore.SaveCategorizedEmail(
+            emailData,
+            result.category,
+            result.confidence,
+            result.metadata
+        )
+        
+        // Log threats if detected
+        IF result.category EQUALS "Phishing/Spam/Scam" THEN
+            dataStore.LogThreat(
+                emailData,
+                "Phishing",
+                result.securityRisk
+            )
+            PRINT "⚠️ THREAT DETECTED: " + result.securityRisk + " risk"
+        END IF
+        
+        // Display result
+        PRINT "Category: " + result.category
+        PRINT "Confidence: " + (result.confidence * 100) + "%"
+        
+        IF result.metadata IS NOT NULL THEN
+            PRINT "Extracted data: " + result.metadata
+        END IF
+        
+        RETURN result
+    END
+    
+    FUNCTION Initialize()
+    BEGIN
+        PRINT "Starting Enhanced Email Categorizer..."
+        
+        // Initialize components
+        categorizer.Initialize()
+        dataStore.Initialize()
+        
+        PRINT "System ready!"
+    END
+    
+    FUNCTION GetStats()
+    BEGIN
+        DECLARE stats AS RECORD
+        stats = dataStore.GetCategoryStats()
+        
+        PRINT "=== Email Statistics ==="
+        PRINT "Meetings: " + stats.meetings
+        PRINT "Deliveries: " + stats.deliveries
+        PRINT "Important: " + stats.important
+        PRINT "Threats blocked: " + stats.threats
+        PRINT "Total processed: " + stats.total
+        
+        RETURN stats
+    END
+    
+    FUNCTION ProcessBatch(emails)
+    BEGIN
+        DECLARE count AS INTEGER
+        count = 0
+        
+        FOR EACH email IN emails DO
+            ProcessEmail(email)
+            count = count + 1
+        END FOR
+        
+        PRINT "Processed " + count + " emails"
+        GetStats()
+    END
+    
+    // Main execution
+    Initialize()
+END

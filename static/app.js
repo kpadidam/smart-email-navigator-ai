@@ -134,6 +134,7 @@ class EmailApp {
             if (response.ok) {
                 this.emails = await response.json();
                 this.renderEmails();
+                this.updateCategoryCounts();
             } else if (response.status === 401) {
                 this.handleLogout();
             }
@@ -183,10 +184,39 @@ class EmailApp {
                 document.getElementById('statTotal').textContent = stats.totalEmails;
                 document.getElementById('statUnread').textContent = stats.unreadEmails;
                 document.getElementById('statCategorized').textContent = stats.categorizedEmails;
+                
+                // Update category counts from loaded emails
+                this.updateCategoryCounts();
             }
         } catch (error) {
             console.error('Failed to load stats:', error);
         }
+    }
+    
+    updateCategoryCounts() {
+        // Count emails by category
+        const categoryCounts = {
+            'Meetings': 0,
+            'Deliveries': 0,
+            'Important': 0,
+            'Phishing/Spam/Scam': 0
+        };
+        
+        this.emails.forEach(email => {
+            if (email.category && categoryCounts.hasOwnProperty(email.category)) {
+                categoryCounts[email.category]++;
+            }
+        });
+        
+        // Update UI counts
+        document.getElementById('meetingsCount').textContent = categoryCounts['Meetings'];
+        document.getElementById('deliveriesCount').textContent = categoryCounts['Deliveries'];
+        document.getElementById('importantCount').textContent = categoryCounts['Important'];
+        document.getElementById('threatsCount').textContent = categoryCounts['Phishing/Spam/Scam'];
+        
+        // Update inbox count (total unread)
+        const unreadCount = this.emails.filter(e => e.status === 'unread').length;
+        document.getElementById('inboxCount').textContent = unreadCount;
     }
 
     renderEmails() {
@@ -227,9 +257,17 @@ class EmailApp {
         
         // Filter by category
         if (this.selectedCategory !== 'all') {
-            filtered = filtered.filter(email => 
-                email.category && email.category.toLowerCase() === this.selectedCategory
-            );
+            filtered = filtered.filter(email => {
+                // Exact match for new categories (case-sensitive)
+                if (email.category === this.selectedCategory) {
+                    return true;
+                }
+                // Fallback for lowercase legacy categories
+                if (email.category && email.category.toLowerCase() === this.selectedCategory.toLowerCase()) {
+                    return true;
+                }
+                return false;
+            });
         }
 
         // Filter by search
@@ -256,14 +294,17 @@ class EmailApp {
             }
         });
         
-        // Update title
+        // Update title with new categories
         const titles = {
             'all': 'All Emails',
+            'Meetings': 'Meeting Invitations',
+            'Deliveries': 'Package Deliveries',
+            'Important': 'Important Emails',
+            'Phishing/Spam/Scam': 'Threats Blocked',
+            // Legacy categories (if any exist in DB)
             'work': 'Work Emails',
             'personal': 'Personal Emails',
-            'promotions': 'Promotions',
-            'social': 'Social',
-            'updates': 'Updates'
+            'promotions': 'Promotions'
         };
         document.getElementById('categoryTitle').textContent = titles[category] || 'Emails';
         

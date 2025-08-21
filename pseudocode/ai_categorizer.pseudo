@@ -1,0 +1,136 @@
+PROGRAM AICategorizer
+BEGIN
+    DECLARE modelPath AS STRING
+    DECLARE confidenceThreshold AS FLOAT
+    DECLARE categories AS ARRAY
+    
+    // Initialize AI model
+    modelPath = "./models/email_classifier.pkl"
+    confidenceThreshold = 0.70
+    categories = ["work", "personal", "promotional", "spam"]
+    
+    FUNCTION Initialize()
+    BEGIN
+        PRINT "Loading AI categorization model..."
+        
+        IF FileExists(modelPath) THEN
+            LoadModel(modelPath)
+            PRINT "Model loaded successfully"
+        ELSE
+            PRINT "Using rule-based categorization"
+        END IF
+    END
+    
+    FUNCTION Categorize(emailContent)
+    BEGIN
+        DECLARE subject AS STRING
+        DECLARE sender AS STRING
+        DECLARE body AS STRING
+        DECLARE category AS STRING
+        DECLARE confidence AS FLOAT
+        
+        // Parse email content
+        subject = ExtractSubject(emailContent)
+        sender = ExtractSender(emailContent)
+        body = ExtractBody(emailContent)
+        
+        // Analyze with AI or rules
+        IF ModelLoaded() THEN
+            category = RunAIModel(subject, body, sender)
+            confidence = GetModelConfidence()
+        ELSE
+            category = ApplyRules(subject, body, sender)
+            confidence = 0.85
+        END IF
+        
+        RETURN category
+    END
+    
+    FUNCTION ApplyRules(subject, body, sender)
+    BEGIN
+        DECLARE category AS STRING
+        
+        // Rule-based categorization
+        IF sender CONTAINS "@company.com" OR subject CONTAINS "meeting" THEN
+            category = "work"
+        ELSE IF subject CONTAINS "sale" OR subject CONTAINS "%" OR subject CONTAINS "offer" THEN
+            category = "promotional"
+        ELSE IF sender CONTAINS "noreply" OR body CONTAINS "unsubscribe" THEN
+            category = "promotional"
+        ELSE IF CheckSpamWords(subject, body) THEN
+            category = "spam"
+        ELSE
+            category = "personal"
+        END IF
+        
+        RETURN category
+    END
+    
+    FUNCTION CheckSpamWords(subject, body)
+    BEGIN
+        DECLARE spamWords AS ARRAY
+        DECLARE text AS STRING
+        
+        spamWords = ["free", "winner", "click here", "urgent", "act now", "limited time"]
+        text = subject + " " + body
+        
+        FOR EACH word IN spamWords DO
+            IF text CONTAINS word THEN
+                RETURN TRUE
+            END IF
+        END FOR
+        
+        RETURN FALSE
+    END
+    
+    FUNCTION RunAIModel(subject, body, sender)
+    BEGIN
+        DECLARE features AS ARRAY
+        DECLARE prediction AS STRING
+        
+        // Extract features for ML model
+        features = ExtractFeatures(subject, body, sender)
+        
+        // Get prediction from model
+        prediction = Model.Predict(features)
+        
+        RETURN prediction
+    END
+    
+    FUNCTION ExtractFeatures(subject, body, sender)
+    BEGIN
+        DECLARE features AS ARRAY
+        
+        // Simple feature extraction
+        features[0] = LENGTH(subject)
+        features[1] = CountWords(body)
+        features[2] = HasAttachment(body)
+        features[3] = IsKnownSender(sender)
+        features[4] = ContainsLinks(body)
+        features[5] = TimeOfDay()
+        
+        RETURN features
+    END
+    
+    FUNCTION GetConfidence()
+    BEGIN
+        // Return last prediction confidence
+        RETURN confidenceScore
+    END
+    
+    FUNCTION TrainModel(trainingData)
+    BEGIN
+        DECLARE model AS MLModel
+        DECLARE accuracy AS FLOAT
+        
+        PRINT "Training categorization model..."
+        
+        model = CreateModel("RandomForest")
+        model.Train(trainingData)
+        
+        accuracy = model.Evaluate()
+        PRINT "Model accuracy: " + accuracy
+        
+        SaveModel(model, modelPath)
+    END
+END

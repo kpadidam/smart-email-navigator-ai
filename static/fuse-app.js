@@ -22,7 +22,9 @@ class FuseMailApp {
                 timestamp: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
                 status: 'unread',
                 avatar: 'MD',
-                avatarColor: 'avatar-purple'
+                avatarColor: 'avatar-purple',
+                category: 'work',
+                confidence: 0.85
             },
             {
                 id: '2',
@@ -434,14 +436,57 @@ class FuseMailApp {
             return;
         }
 
-        emailList.innerHTML = filteredEmails.map(email => `
+        // Group emails by category for smart inbox view
+        if (this.selectedFolder === 'inbox' || this.selectedFolder === 'smart') {
+            const categorized = this.groupByCategory(filteredEmails);
+            let html = '';
+            
+            for (const [category, emails] of Object.entries(categorized)) {
+                if (emails.length > 0) {
+                    html += `
+                        <div class="category-section">
+                            <div class="category-header">
+                                <span class="category-icon">${this.getCategoryIcon(category)}</span>
+                                <span class="category-title">${this.formatCategory(category)}</span>
+                                <span class="category-count">${emails.length}</span>
+                            </div>
+                            <div class="category-emails">
+                    `;
+                    
+                    html += emails.map(email => this.renderEmailItem(email)).join('');
+                    html += '</div></div>';
+                }
+            }
+            
+            emailList.innerHTML = html || this.renderEmailItems(filteredEmails);
+        } else {
+            emailList.innerHTML = this.renderEmailItems(filteredEmails);
+        }
+
+        // Add click listeners
+        document.querySelectorAll('.email-item').forEach(item => {
+            item.addEventListener('click', () => this.selectEmail(item.dataset.id));
+        });
+    }
+    
+    renderEmailItem(email) {
+        const categoryBadge = email.category ? `
+            <span class="category-badge category-${email.category.toLowerCase()}" title="AI Confidence: ${Math.round((email.confidence || 0.7) * 100)}%">
+                ${this.getCategoryIcon(email.category)} ${email.category}
+            </span>
+        ` : '';
+        
+        return `
             <div class="email-item ${email.status === 'unread' ? 'unread' : ''}" data-id="${email.id}">
                 <div class="email-header">
                     <div class="email-avatar ${email.avatarColor || this.getRandomAvatarColor()}">
                         ${email.avatar || this.getInitials(email.sender)}
                     </div>
                     <div class="email-content">
-                        <div class="email-sender">${email.sender}</div>
+                        <div class="email-sender">
+                            ${email.sender}
+                            ${categoryBadge}
+                        </div>
                         <div class="email-subject">
                             ${email.subject}
                             ${email.hasAttachment ? '<span class="material-icons" style="font-size: 16px; vertical-align: middle; margin-left: 4px;">attach_file</span>' : ''}
@@ -451,12 +496,45 @@ class FuseMailApp {
                     <div class="email-time">${this.formatTime(email.timestamp)}</div>
                 </div>
             </div>
-        `).join('');
-
-        // Add click listeners
-        document.querySelectorAll('.email-item').forEach(item => {
-            item.addEventListener('click', () => this.selectEmail(item.dataset.id));
+        `;
+    }
+    
+    renderEmailItems(emails) {
+        return emails.map(email => this.renderEmailItem(email)).join('');
+    }
+    
+    groupByCategory(emails) {
+        const categories = {
+            'work': [],
+            'personal': [],
+            'promotional': [],
+            'spam': []
+        };
+        
+        emails.forEach(email => {
+            const cat = (email.category || 'personal').toLowerCase();
+            if (categories[cat]) {
+                categories[cat].push(email);
+            } else {
+                categories['personal'].push(email);
+            }
         });
+        
+        return categories;
+    }
+    
+    getCategoryIcon(category) {
+        const icons = {
+            'work': '💼',
+            'personal': '👤',
+            'promotional': '📢',
+            'spam': '🚫'
+        };
+        return icons[category.toLowerCase()] || '📧';
+    }
+    
+    formatCategory(category) {
+        return category.charAt(0).toUpperCase() + category.slice(1);
     }
 
     filterEmailsByFolder() {

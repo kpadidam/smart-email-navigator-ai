@@ -1,0 +1,158 @@
+PROGRAM EnhancedCategorizer
+BEGIN
+    DECLARE email AS RECORD
+    DECLARE category AS STRING
+    DECLARE confidence AS FLOAT
+    DECLARE securityRisk AS STRING
+    DECLARE metadata AS RECORD
+    
+    FUNCTION CategorizeEmail(emailData)
+    BEGIN
+        // Step 1: Security check first
+        securityRisk = CheckForThreats(emailData)
+        
+        IF securityRisk EQUALS "HIGH" OR securityRisk EQUALS "CRITICAL" THEN
+            category = "Phishing/Spam/Scam"
+            confidence = 0.95
+            RETURN category, confidence, securityRisk
+        END IF
+        
+        // Step 2: Check for meetings
+        IF CheckMeetingPatterns(emailData) THEN
+            category = "Meetings"
+            metadata = ExtractMeetingData(emailData)
+            confidence = CalculateConfidence(emailData, category)
+            RETURN category, confidence, metadata
+        END IF
+        
+        // Step 3: Check for deliveries
+        IF CheckDeliveryPatterns(emailData) THEN
+            category = "Deliveries"
+            metadata = ExtractTrackingData(emailData)
+            confidence = CalculateConfidence(emailData, category)
+            RETURN category, confidence, metadata
+        END IF
+        
+        // Step 4: Check importance
+        IF CheckImportanceIndicators(emailData) THEN
+            category = "Important"
+            confidence = CalculateConfidence(emailData, category)
+            RETURN category, confidence
+        END IF
+        
+        // Default to Important with lower confidence
+        category = "Important"
+        confidence = 0.60
+        RETURN category, confidence
+    END
+    
+    FUNCTION CheckForThreats(emailData)
+    BEGIN
+        DECLARE riskScore AS INTEGER
+        riskScore = 0
+        
+        // Check for scam keywords
+        IF emailData.subject CONTAINS "won" AND emailData.subject CONTAINS "$" THEN
+            riskScore = riskScore + 50
+        END IF
+        
+        // Check for suspicious URLs
+        IF emailData.body CONTAINS "bit.ly" OR emailData.body CONTAINS "tinyurl" THEN
+            riskScore = riskScore + 30
+        END IF
+        
+        // Check for personal info requests
+        IF emailData.body CONTAINS "SSN" OR emailData.body CONTAINS "password" THEN
+            riskScore = riskScore + 40
+        END IF
+        
+        IF riskScore >= 70 THEN
+            RETURN "HIGH"
+        ELSE IF riskScore >= 40 THEN
+            RETURN "MEDIUM"
+        ELSE
+            RETURN "LOW"
+        END IF
+    END
+    
+    FUNCTION CheckMeetingPatterns(emailData)
+    BEGIN
+        IF emailData.subject CONTAINS "meeting" OR 
+           emailData.subject CONTAINS "invite" OR
+           emailData.subject CONTAINS "calendar" OR
+           emailData.body CONTAINS "zoom.us" OR
+           emailData.body CONTAINS "teams.microsoft" THEN
+            RETURN TRUE
+        ELSE
+            RETURN FALSE
+        END IF
+    END
+    
+    FUNCTION CheckDeliveryPatterns(emailData)
+    BEGIN
+        IF emailData.sender CONTAINS "fedex" OR
+           emailData.sender CONTAINS "ups" OR
+           emailData.sender CONTAINS "amazon" OR
+           emailData.body CONTAINS "tracking" OR
+           emailData.body CONTAINS "package" THEN
+            RETURN TRUE
+        ELSE
+            RETURN FALSE
+        END IF
+    END
+    
+    FUNCTION CheckImportanceIndicators(emailData)
+    BEGIN
+        IF emailData.subject CONTAINS "urgent" OR
+           emailData.subject CONTAINS "important" OR
+           emailData.subject CONTAINS "deadline" OR
+           emailData.priority EQUALS "high" THEN
+            RETURN TRUE
+        ELSE
+            RETURN FALSE
+        END IF
+    END
+    
+    FUNCTION ExtractMeetingData(emailData)
+    BEGIN
+        DECLARE meetingTime AS STRING
+        DECLARE meetingDate AS STRING
+        
+        // Simple pattern matching for time
+        meetingTime = ExtractPattern(emailData.subject + emailData.body, "[0-9]+[ap]m")
+        meetingDate = ExtractPattern(emailData.subject + emailData.body, "tomorrow|today|monday|tuesday")
+        
+        RETURN {time: meetingTime, date: meetingDate}
+    END
+    
+    FUNCTION ExtractTrackingData(emailData)
+    BEGIN
+        DECLARE trackingNumber AS STRING
+        
+        // Look for tracking number patterns
+        trackingNumber = ExtractPattern(emailData.body, "[0-9]{9,20}")
+        
+        RETURN {tracking: trackingNumber}
+    END
+    
+    FUNCTION CalculateConfidence(emailData, category)
+    BEGIN
+        DECLARE confidence AS FLOAT
+        confidence = 0.70  // Base confidence
+        
+        // Boost confidence based on multiple signals
+        IF category EQUALS "Meetings" AND emailData.hasAttachment THEN
+            confidence = confidence + 0.15
+        END IF
+        
+        IF category EQUALS "Deliveries" AND emailData.sender CONTAINS "tracking" THEN
+            confidence = confidence + 0.20
+        END IF
+        
+        IF confidence > 1.0 THEN
+            confidence = 0.99
+        END IF
+        
+        RETURN confidence
+    END
+END

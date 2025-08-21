@@ -1,0 +1,112 @@
+PROGRAM EnhancedDataStore
+BEGIN
+    DECLARE database AS CONNECTION
+    DECLARE categorizedEmails AS ARRAY
+    
+    FUNCTION Initialize()
+    BEGIN
+        database = OpenDatabase("email_navigator.db")
+        CreateTablesIfNeeded()
+    END
+    
+    FUNCTION CreateTablesIfNeeded()
+    BEGIN
+        CREATE TABLE IF NOT EXISTS enhanced_emails (
+            id TEXT PRIMARY KEY,
+            sender TEXT,
+            subject TEXT,
+            body TEXT,
+            category TEXT,
+            confidence FLOAT,
+            security_risk TEXT,
+            metadata JSON,
+            processed_at TIMESTAMP
+        )
+        
+        CREATE TABLE IF NOT EXISTS threat_log (
+            id TEXT PRIMARY KEY,
+            email_id TEXT,
+            threat_type TEXT,
+            risk_level TEXT,
+            detected_at TIMESTAMP
+        )
+    END
+    
+    FUNCTION SaveCategorizedEmail(email, category, confidence, metadata)
+    BEGIN
+        DECLARE sql AS STRING
+        sql = "INSERT INTO enhanced_emails VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        
+        database.Execute(sql, 
+            GenerateID(),
+            email.sender,
+            email.subject,
+            email.body,
+            category,
+            confidence,
+            email.securityRisk,
+            ConvertToJSON(metadata),
+            GetCurrentTime()
+        )
+    END
+    
+    FUNCTION LogThreat(email, threatType, riskLevel)
+    BEGIN
+        DECLARE sql AS STRING
+        sql = "INSERT INTO threat_log VALUES (?, ?, ?, ?, ?)"
+        
+        database.Execute(sql,
+            GenerateID(),
+            email.id,
+            threatType,
+            riskLevel,
+            GetCurrentTime()
+        )
+    END
+    
+    FUNCTION GetEmailsByCategory(category)
+    BEGIN
+        DECLARE sql AS STRING
+        DECLARE results AS ARRAY
+        
+        sql = "SELECT * FROM enhanced_emails WHERE category = ? ORDER BY processed_at DESC"
+        results = database.Query(sql, category)
+        
+        RETURN results
+    END
+    
+    FUNCTION GetHighRiskEmails()
+    BEGIN
+        DECLARE sql AS STRING
+        DECLARE results AS ARRAY
+        
+        sql = "SELECT * FROM enhanced_emails WHERE security_risk IN ('HIGH', 'CRITICAL')"
+        results = database.Query(sql)
+        
+        RETURN results
+    END
+    
+    FUNCTION GetCategoryStats()
+    BEGIN
+        DECLARE stats AS RECORD
+        
+        stats.meetings = CountByCategory("Meetings")
+        stats.deliveries = CountByCategory("Deliveries")
+        stats.important = CountByCategory("Important")
+        stats.threats = CountByCategory("Phishing/Spam/Scam")
+        stats.total = stats.meetings + stats.deliveries + stats.important + stats.threats
+        
+        RETURN stats
+    END
+    
+    FUNCTION CountByCategory(category)
+    BEGIN
+        DECLARE sql AS STRING
+        DECLARE count AS INTEGER
+        
+        sql = "SELECT COUNT(*) FROM enhanced_emails WHERE category = ?"
+        count = database.QueryScalar(sql, category)
+        
+        RETURN count
+    END
+END

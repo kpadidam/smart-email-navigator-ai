@@ -1,0 +1,162 @@
+PROGRAM EmailSync
+BEGIN
+    DECLARE gmailAPI AS GmailService
+    DECLARE maxResults AS INTEGER
+    
+    maxResults = 50
+    
+    FUNCTION Initialize()
+    BEGIN
+        PRINT "Email sync service ready"
+    END
+    
+    FUNCTION FetchEmails(userToken, limit)
+    BEGIN
+        DECLARE emails AS ARRAY
+        DECLARE rawMessages AS ARRAY
+        DECLARE processedEmail AS RECORD
+        
+        // Connect to Gmail API
+        gmailAPI = ConnectToGmail(userToken)
+        
+        IF gmailAPI IS NULL THEN
+            PRINT "Failed to connect to Gmail"
+            RETURN EMPTY_ARRAY
+        END IF
+        
+        // Get message list
+        rawMessages = gmailAPI.GetMessages("in:inbox", limit)
+        
+        FOR EACH message IN rawMessages DO
+            // Get full message details
+            processedEmail = ProcessMessage(message.id)
+            
+            IF processedEmail IS NOT NULL THEN
+                ADD processedEmail TO emails
+            END IF
+        END FOR
+        
+        PRINT "Fetched " + emails.count + " emails"
+        RETURN emails
+    END
+    
+    FUNCTION ConnectToGmail(token)
+    BEGIN
+        DECLARE service AS GmailService
+        
+        TRY
+            service = CreateGmailService(token)
+            RETURN service
+        CATCH error
+            PRINT "Gmail connection error: " + error
+            RETURN NULL
+        END
+    END
+    
+    FUNCTION ProcessMessage(messageId)
+    BEGIN
+        DECLARE fullMessage AS RECORD
+        DECLARE email AS RECORD
+        
+        // Get full message from Gmail
+        fullMessage = gmailAPI.GetMessage(messageId)
+        
+        IF fullMessage IS NULL THEN
+            RETURN NULL
+        END IF
+        
+        // Extract email data
+        email.gmail_id = messageId
+        email.subject = ExtractHeader(fullMessage, "Subject")
+        email.sender = ExtractHeader(fullMessage, "From")
+        email.sender_email = ExtractEmailAddress(email.sender)
+        email.date = ExtractHeader(fullMessage, "Date")
+        email.body = ExtractBody(fullMessage)
+        
+        RETURN email
+    END
+    
+    FUNCTION ExtractHeader(message, headerName)
+    BEGIN
+        DECLARE headers AS ARRAY
+        DECLARE value AS STRING
+        
+        headers = message.payload.headers
+        
+        FOR EACH header IN headers DO
+            IF header.name EQUALS headerName THEN
+                value = header.value
+                RETURN value
+            END IF
+        END FOR
+        
+        RETURN ""
+    END
+    
+    FUNCTION ExtractEmailAddress(fromHeader)
+    BEGIN
+        DECLARE emailStart AS INTEGER
+        DECLARE emailEnd AS INTEGER
+        DECLARE email AS STRING
+        
+        // Extract email from "Name <email@domain.com>" format
+        emailStart = FIND("<", fromHeader)
+        emailEnd = FIND(">", fromHeader)
+        
+        IF emailStart > 0 AND emailEnd > emailStart THEN
+            email = SUBSTRING(fromHeader, emailStart + 1, emailEnd - 1)
+            RETURN email
+        ELSE
+            RETURN fromHeader
+        END IF
+    END
+    
+    FUNCTION ExtractBody(message)
+    BEGIN
+        DECLARE parts AS ARRAY
+        DECLARE body AS STRING
+        DECLARE decodedBody AS STRING
+        
+        parts = message.payload.parts
+        
+        IF parts IS EMPTY THEN
+            // Simple message
+            body = message.payload.body.data
+        ELSE
+            // Multipart message
+            FOR EACH part IN parts DO
+                IF part.mimeType EQUALS "text/plain" THEN
+                    body = part.body.data
+                    BREAK
+                END IF
+            END FOR
+        END IF
+        
+        // Decode base64
+        decodedBody = DecodeBase64(body)
+        
+        RETURN decodedBody
+    END
+    
+    FUNCTION DecodeBase64(encodedString)
+    BEGIN
+        DECLARE decoded AS STRING
+        
+        TRY
+            decoded = Base64Decode(encodedString)
+            RETURN decoded
+        CATCH error
+            PRINT "Decode error: " + error
+            RETURN encodedString
+        END
+    END
+    
+    FUNCTION MarkAsRead(messageId)
+    BEGIN
+        DECLARE result AS BOOLEAN
+        
+        result = gmailAPI.ModifyLabels(messageId, [], ["UNREAD"])
+        
+        RETURN result
+    END
+END
